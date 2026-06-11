@@ -1,17 +1,17 @@
-# Dell 7609WU Projector — Home Assistant integration
+# Dell 7609WU Projector for Home Assistant
 
 [![Validate](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml)
 [![Lint](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
-Control and monitor **Dell 7609WU** projectors over the network from Home
-Assistant, using the projector's built-in web management interface (no RS232
-cable needed). Dell never documented this HTTP interface — it was
-reverse-engineered for this project; see [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
+A Home Assistant integration for controlling Dell 7609WU projectors over the
+network, using the projector's built-in web management page instead of an RS232
+cable. Dell never documented this HTTP interface, so it was reverse-engineered
+for this project. The full write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
-## Features
+## What you get
 
-Per projector (multiple projectors supported, one config entry each):
+Each projector becomes a device with the following entities:
 
 | Entity | Type | Notes |
 |---|---|---|
@@ -22,69 +22,79 @@ Per projector (multiple projectors supported, one config entry each):
 | Video mode | select | Presentation, Bright, Movie, sRGB, Custom |
 | Aspect ratio | select | 1:1, 4:3, 16:9 |
 | Projection mode | select | front/rear, desktop/ceiling |
-| Power saving timeout | select | Off – 120 min |
-| Brightness / Contrast | number | 0–100 |
-| Volume | number | 0–20 |
+| Power saving timeout | select | Off to 120 min |
+| Brightness / Contrast | number | 0-100 |
+| Volume | number | 0-20 |
 | Status | sensor | Lamp ON, Standby, Warm up, Cooling, Power Saving |
 | Lamp hours | sensor | total lamp runtime |
 | Error status | sensor | diagnostic |
 | Firmware version | sensor | diagnostic, disabled by default |
 | Auto adjust | button | trigger source auto-adjustment |
 
-- **Authentication**: supported per device. The projector's username is fixed
-  to `administrator` by firmware; if an admin password is enabled in the
-  projector's web management, enter it during setup. Includes reauth (HA will
-  prompt if the password changes) and reconfigure flows.
-- **Discovery**: projectors may be discovered via DHCP (Dell OUI match plus a
-  probe of the web interface). Manual setup by IP is always available.
-- **Local polling** every 30 seconds; commands trigger an immediate refresh.
+You can add as many projectors as you like, one config entry per unit. The
+integration polls each projector every 30 seconds and refreshes right away
+after you send a command.
+
+If the projector has an admin password set, enter it during setup. The
+username is hardcoded to `administrator` in the firmware so you only need the
+password. If the password changes later, Home Assistant will prompt you to
+reauthenticate.
+
+Projectors can also show up automatically via DHCP discovery (the integration
+watches for Dell MAC addresses and probes the web interface to confirm it's
+actually a projector), but adding one manually by IP always works.
 
 ## Installation
 
 ### HACS (custom repository)
 
-1. HACS → menu (⋮) → *Custom repositories*.
+1. In HACS, open the menu and pick "Custom repositories".
 2. Add `https://github.com/CaelanBorowiec/ha-dell-projector-network-control`
-   with category **Integration**.
-3. Install **Dell 7609WU Projector**, then restart Home Assistant.
+   with category "Integration".
+3. Install "Dell 7609WU Projector" and restart Home Assistant.
 
 ### Manual
 
 Copy `custom_components/dell_7609wu/` into your Home Assistant
 `config/custom_components/` directory and restart.
 
-## Configuration
+## Setup
 
-1. Settings → Devices & Services → **Add Integration** → *Dell 7609WU Projector*.
-2. Enter the projector's IP address (e.g. `10.10.0.227`).
-3. If the projector has an admin password enabled, enter it (username is fixed
-   to `administrator`). Leave empty otherwise.
+1. Go to Settings > Devices & Services > Add Integration and search for
+   "Dell 7609WU Projector".
+2. Enter the projector's IP address.
+3. Enter the admin password if one is set on the projector, otherwise leave it
+   blank.
 
 Repeat for each projector.
 
-## Repository contents
+## What's in this repo
 
 | Path | Purpose |
 |---|---|
 | `custom_components/dell_7609wu/` | the Home Assistant integration |
 | `docs/PROTOCOL.md` | reverse-engineered HTTP API reference for the 7609WU |
-| `tools/api-tester.html` | standalone live test UI — open in a browser, point it at a projector, and fire raw commands |
-| `tools/smoke_test.py` | standalone CLI test of the API client (`python tools/smoke_test.py <ip> [--password X] [--command]`) |
+| `tools/api-tester.html` | standalone test page. Open it in a browser, point it at a projector, and fire raw commands |
+| `tools/smoke_test.py` | CLI test of the API client (`python tools/smoke_test.py <ip> [--password X] [--command]`) |
 
-## Notes & limitations
+## Notes and limitations
 
-- The 7609WU's web server is HTTP/1.0 from 2008: one session cookie (`ATOP`),
-  HTML scraping for state, and full-form posts for commands. The integration
-  faithfully replays browser behavior; see the protocol doc before changing
-  payload handling.
-- Power state reports the firmware's own status text. After Power ON/OFF the
-  projector goes through *Warm up*/*Cooling*, visible in the Status sensor.
-- The projector password is limited to 4 characters by the firmware and the
-  login uses unsalted MD5 — treat it as a convenience lock, not security.
-- Inclusion in the HACS **default** store would additionally require a
-  [home-assistant/brands](https://github.com/home-assistant/brands) logo PR and
-  repository description/topics on GitHub. Until then, install as a custom
-  repository (above).
+The 7609WU's web server is HTTP/1.0 from 2008. There's one session cookie
+(`ATOP`), state is scraped from HTML, and commands are full form posts. The
+integration replays exactly what a browser would send, so read the protocol
+doc before changing any of the payload handling.
+
+Power state comes from the firmware's own status text. After turning the
+projector on or off it goes through "Warm up" or "Cooling" first, which you
+can watch in the Status sensor.
+
+The projector password is limited to 4 characters by the firmware and the
+login uses unsalted MD5. Treat it as a convenience lock, not real security.
+
+Getting into the HACS default store would also require a logo PR to
+[home-assistant/brands](https://github.com/home-assistant/brands) plus a repo
+description and topics on GitHub. Until then, install it as a custom
+repository as described above.
 
 ## Development
 
