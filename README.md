@@ -124,10 +124,11 @@ can watch in the Status sensor.
 The projector password is limited to 4 characters by the firmware and the
 login uses unsalted MD5. Treat it as a convenience lock, not real security.
 
-Getting into the HACS default store would also require a logo PR to
-[home-assistant/brands](https://github.com/home-assistant/brands) plus a repo
-description and topics on GitHub. Until then, install it as a custom
-repository as described above.
+Getting into the HACS default store also requires a repo description and
+topics on GitHub. Brand icons ship inline in
+`custom_components/dell_7609wu/brand/` (required for HACS validation since
+Home Assistant 2026.3). Until then, install it as a custom repository as
+described above.
 
 ## Development
 
