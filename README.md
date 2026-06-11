@@ -4,10 +4,12 @@
 [![Lint](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
-A Home Assistant integration for controlling Dell 7609WU projectors over the
+A Home Assistant integration for controlling Dell 7609WU and other compatible Dell projectors (like the 1610HD, 4210X, 4220, 4310WX, 4320, S320wi, etc.) over the
 network, using the projector's built-in web management page instead of an RS232
 cable. Dell never documented this HTTP interface, so it was reverse-engineered
 for this project. The full write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
+
+This integration works with any Dell projector that uses the "Web Management" interface with the `ATOP` cookie and MD5 challenge-response login.
 
 ## What you get
 

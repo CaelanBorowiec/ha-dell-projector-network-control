@@ -36,12 +36,12 @@
     "error": {
       "cannot_connect": "Failed to connect to the projector",
       "invalid_auth": "The projector rejected the admin password",
-      "not_supported": "The device did not identify as a Dell 7609WU web management interface",
+      "not_supported": "The device did not identify as a supported Dell web management interface",
       "unknown": "Unexpected error"
     },
     "abort": {
       "already_configured": "This projector is already configured",
-      "not_supported": "Device is not a Dell 7609WU projector",
+      "not_supported": "Device is not a supported Dell projector",
       "reauth_successful": "Re-authentication was successful",
       "reconfigure_successful": "Reconfiguration was successful",
       "unique_id_mismatch": "The device at this host is a different projector"

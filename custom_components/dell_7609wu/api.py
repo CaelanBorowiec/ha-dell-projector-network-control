@@ -33,7 +33,6 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICE_TITLE = "DELL 7609WU Web Management"
 _LOGIN_FORM_MARKER = "/tgi/login.tgi"
 _FRAMESET_MARKER = "<frameset"
 
@@ -354,9 +353,9 @@ class Dell7609Client:
         """Fetch / to obtain the ATOP session cookie; returns the page."""
         self._cookie = None
         text, _ = await self._raw_request("GET", "/")
-        if DEVICE_TITLE not in text:
+        if "Web Management" not in text:
             raise Dell7609UnsupportedError(
-                f"Host {self._host} does not look like a Dell 7609WU "
+                f"Host {self._host} does not look like a supported Dell "
                 "web management interface"
             )
         return text
