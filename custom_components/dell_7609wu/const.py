@@ -1,11 +1,11 @@
-"""Constants for the Dell 7609WU Projector integration."""
+"""Constants for the Dell Projector integration."""
 
 from __future__ import annotations
 
 DOMAIN = "dell_7609wu"
 
 MANUFACTURER = "Dell"
-MODEL = "7609WU"
+DEFAULT_MODEL = "Projector"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 30
 

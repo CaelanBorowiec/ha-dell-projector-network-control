@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER, MODEL
+from .const import DEFAULT_MODEL, DOMAIN, MANUFACTURER
 from .coordinator import Dell7609Coordinator
 
 
@@ -29,8 +29,9 @@ class Dell7609Entity(CoordinatorEntity[Dell7609Coordinator]):
                 {(CONNECTION_NETWORK_MAC, mac)} if state.mac_address else set()
             ),
             manufacturer=MANUFACTURER,
-            model=MODEL,
-            name=state.projector_name or f"Dell {MODEL}",
+            model=state.group_name or DEFAULT_MODEL,
+            name=state.projector_name
+            or (f"Dell {state.group_name}" if state.group_name else "Dell Projector"),
             sw_version=state.firmware_version,
             configuration_url=f"http://{coordinator.client.host}/",
         )

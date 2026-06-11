@@ -1,4 +1,4 @@
-"""The Dell 7609WU Projector integration."""
+"""The Dell Projector integration."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: Dell7609ConfigEntry) -> bool:
-    """Set up Dell 7609WU Projector from a config entry."""
+    """Set up Dell Projector from a config entry."""
     client = Dell7609Client(
         entry.data[CONF_HOST],
         async_get_clientsession(hass),

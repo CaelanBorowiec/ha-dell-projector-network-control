@@ -2,13 +2,13 @@
   <img src="images/logo.png" alt="DellHA Logo" width="300" />
 </p>
 
-# Dell 7609WU Projector for Home Assistant
+# Dell Projector for Home Assistant
 
 [![Validate](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml)
 [![Lint](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
-A Home Assistant integration for controlling Dell 7609WU and other compatible Dell projectors (like the 1610HD, 4210X, 4220, 4310WX, 4320, S320wi, etc.) over the
+A Home Assistant integration for controlling compatible Dell projectors (7609WU, 1610HD, 4210X, 4220, 4310WX, 4320, S320wi, and others) over the
 network, using the projector's built-in web management page instead of an RS232
 cable. Dell never documented this HTTP interface, so it was reverse-engineered
 for this project. The full write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
@@ -17,7 +17,7 @@ This integration works with any Dell projector that uses the "Web Management" in
 
 ## Supported Projectors
 
-This integration has been designed for the **Dell 7609WU**, but the underlying web management interface is shared across a wide range of Dell projectors. The following models are known or highly likely to be supported:
+Originally developed on the **Dell 7609WU**, but the underlying web management interface is shared across a wide range of Dell projectors. The following models are known or highly likely to be supported:
 
 - Dell 1209S
 - Dell 1410X
@@ -84,7 +84,7 @@ actually a projector), but adding one manually by IP always works.
 1. In HACS, open the menu and pick "Custom repositories".
 2. Add `https://github.com/CaelanBorowiec/ha-dell-projector-network-control`
    with category "Integration".
-3. Install "Dell 7609WU Projector" and restart Home Assistant.
+3. Install "Dell Projector" and restart Home Assistant.
 
 ### Manual
 
@@ -94,7 +94,7 @@ Copy `custom_components/dell_7609wu/` into your Home Assistant
 ## Setup
 
 1. Go to Settings > Devices & Services > Add Integration and search for
-   "Dell 7609WU Projector".
+   "Dell Projector".
 2. Enter the projector's IP address.
 3. Enter the admin password if one is set on the projector, otherwise leave it
    blank.

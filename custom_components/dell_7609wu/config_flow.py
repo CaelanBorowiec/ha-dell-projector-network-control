@@ -1,4 +1,4 @@
-"""Config flow for the Dell 7609WU Projector integration."""
+"""Config flow for the Dell Projector integration."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ PASSWORD_SCHEMA = vol.Schema({vol.Optional(CONF_PASSWORD): str})
 
 
 class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Dell 7609WU Projector."""
+    """Handle a config flow for Dell Projector."""
 
     VERSION = 1
 
@@ -48,7 +48,11 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     def _title(state: ProjectorState) -> str:
-        return state.projector_name or "Dell 7609WU"
+        if state.projector_name:
+            return state.projector_name
+        if state.group_name:
+            return f"Dell {state.group_name}"
+        return "Dell Projector"
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -88,14 +92,14 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
-        """DHCP discovery: probe the host, abort quietly if not a 7609WU."""
+        """DHCP discovery: probe the host, abort quietly if not a Dell projector."""
         host = discovery_info.ip
         await self.async_set_unique_id(format_mac(discovery_info.macaddress))
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
         try:
             state = await self._async_validate(host, None)
         except Dell7609AuthError:
-            # It is a 7609WU but needs a password; continue and ask for it.
+            # Projector needs a password; continue and ask for it.
             self._discovered_host = host
             return await self.async_step_discovery_confirm()
         except Dell7609Error:
