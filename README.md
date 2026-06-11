@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/logo.png" alt="DellHA Logo" width="300" />
+</p>
+
 # Dell 7609WU Projector for Home Assistant
 
 [![Validate](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml)
