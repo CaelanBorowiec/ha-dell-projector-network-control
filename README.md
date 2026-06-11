@@ -136,7 +136,7 @@ described above.
 python -m venv .venv
 .venv/Scripts/pip install aiohttp ruff          # Windows
 ruff check custom_components tools
-python tools/smoke_test.py 10.10.0.227 --command
+python tools/smoke_test.py <projector-ip> --command
 ```
 
 CI runs [HACS validation](https://github.com/hacs/action),

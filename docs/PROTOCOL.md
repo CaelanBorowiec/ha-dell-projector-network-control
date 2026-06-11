@@ -82,7 +82,7 @@ Device identity and summary, in label/value table rows
 | Status | `Lamp ON` | same text as `PJSTATE2` |
 | Lamp Hours | `923 hr` | |
 | Firmware Version | `M0R001` | |
-| IP Address | `10.10.0.227` | |
+| IP Address | `192.168.1.100` | example value |
 | MAC Address | `00:1E:C9:BA:5D:C5` | stable unique ID |
 | Admin Password | `Not Set!` / `Set` | whether login is required |
 

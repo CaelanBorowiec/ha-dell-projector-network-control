@@ -2,7 +2,7 @@
 
 Runs against a live projector without Home Assistant:
 
-    python tools/smoke_test.py 10.10.0.227 [--password XXXX] [--command]
+    python tools/smoke_test.py <projector-ip> [--password XXXX] [--command]
 
 By default only reads state. With --command it additionally exercises the
 command path by re-submitting the current volume (a no-op on the device,
