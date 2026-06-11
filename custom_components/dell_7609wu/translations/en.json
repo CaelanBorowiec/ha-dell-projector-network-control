@@ -1,0 +1,78 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Dell 7609WU Projector",
+        "description": "Set up a Dell 7609WU projector by IP address. The username is fixed to 'administrator' by the projector firmware; only set a password if one is enabled in the projector's web management.",
+        "data": {
+          "host": "Host (IP address)",
+          "password": "Admin password (if enabled)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Dell 7609WU Projector found",
+        "description": "Add the projector at {host}? If an admin password is enabled on the projector, enter it below (username is fixed to 'administrator').",
+        "data": {
+          "password": "Admin password (if enabled)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate projector",
+        "description": "The projector at {host} rejected the stored admin password. Enter the current one (leave empty if the password was disabled).",
+        "data": {
+          "password": "Admin password"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure projector",
+        "description": "Update the host or admin password for this projector.",
+        "data": {
+          "host": "Host (IP address)",
+          "password": "Admin password (if enabled)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the projector",
+      "invalid_auth": "The projector rejected the admin password",
+      "not_supported": "The device did not identify as a Dell 7609WU web management interface",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This projector is already configured",
+      "not_supported": "Device is not a Dell 7609WU projector",
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Reconfiguration was successful",
+      "unique_id_mismatch": "The device at this host is a different projector"
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": { "name": "Power" },
+      "blank_screen": { "name": "Blank screen" },
+      "eco_mode": { "name": "ECO mode" }
+    },
+    "select": {
+      "source": { "name": "Source" },
+      "video_mode": { "name": "Video mode" },
+      "aspect_ratio": { "name": "Aspect ratio" },
+      "projection_mode": { "name": "Projection mode" },
+      "power_saving": { "name": "Power saving timeout" }
+    },
+    "number": {
+      "brightness": { "name": "Brightness" },
+      "contrast": { "name": "Contrast" },
+      "volume": { "name": "Volume" }
+    },
+    "sensor": {
+      "status": { "name": "Status" },
+      "lamp_hours": { "name": "Lamp hours" },
+      "error_status": { "name": "Error status" },
+      "firmware_version": { "name": "Firmware version" }
+    },
+    "button": {
+      "auto_adjust": { "name": "Auto adjust" }
+    }
+  }
+}
