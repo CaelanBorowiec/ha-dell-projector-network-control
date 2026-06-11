@@ -11,6 +11,33 @@ for this project. The full write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 This integration works with any Dell projector that uses the "Web Management" interface with the `ATOP` cookie and MD5 challenge-response login.
 
+## Supported Projectors
+
+This integration has been designed for the **Dell 7609WU**, but the underlying web management interface is shared across a wide range of Dell projectors. The following models are known or highly likely to be supported:
+
+- Dell 1209S
+- Dell 1410X
+- Dell 1510X
+- Dell 1610HD
+- Dell 3400MP
+- Dell 4210X
+- Dell 4220
+- Dell 4310WX
+- Dell 4320
+- Dell 4610X
+- Dell 7609WU
+- Dell 7700HD
+- Dell M110
+- Dell M115HD
+- Dell S300w
+- Dell S320
+- Dell S320wi
+- Dell S500
+- Dell S500wi
+- Dell S510
+
+If your Dell projector has an ethernet port or wireless module and a web interface that prompts for an "Admin Password" (defaulting to `admin`), it will likely work with this integration.
+
 ## What you get
 
 Each projector becomes a device with the following entities:
