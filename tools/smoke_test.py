@@ -23,7 +23,7 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parents[1] / "custom_components" / "dell_7609wu")
 )
 
-from api import Dell7609Client, state_as_dict  # noqa: E402
+from api import Dell7609Client, state_as_dict
 
 
 async def main() -> int:

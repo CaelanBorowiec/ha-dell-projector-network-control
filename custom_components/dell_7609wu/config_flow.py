@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -41,9 +40,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._discovered_host: str | None = None
 
-    async def _async_validate(
-        self, host: str, password: str | None
-    ) -> ProjectorState:
+    async def _async_validate(self, host: str, password: str | None) -> ProjectorState:
         client = Dell7609Client(
             host, async_get_clientsession(self.hass), password=password
         )
@@ -135,9 +132,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reauth(
-        self, entry_data: dict[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """The stored password stopped working; ask for a new one."""
         return await self.async_step_reauth_confirm()
 
@@ -183,9 +178,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             except Dell7609Error:
                 errors["base"] = "cannot_connect"
             else:
-                await self.async_set_unique_id(
-                    format_mac(state.mac_address or host)
-                )
+                await self.async_set_unique_id(format_mac(state.mac_address or host))
                 self._abort_if_unique_id_mismatch()
                 return self.async_update_reload_and_abort(
                     entry,

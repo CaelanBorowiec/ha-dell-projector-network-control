@@ -23,7 +23,8 @@ import asyncio
 import hashlib
 import logging
 import re
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlencode
@@ -266,9 +267,7 @@ def _selected_option_value(html: str, name: str) -> str | None:
     return options[0][0]
 
 
-_HOME_FIELD_RE = (
-    r"{label}:</strong></font></td>.*?sans-serif\">\s*(.*?)\s*</font>"
-)
+_HOME_FIELD_RE = r"{label}:</strong></font></td>.*?sans-serif\">\s*(.*?)\s*</font>"
 
 
 def _home_value(html: str, label: str) -> str | None:
@@ -390,9 +389,7 @@ class Dell7609Client:
                 f"Could not find login challenge on projector at {self._host}"
             )
         challenge = match.group(1)
-        response = hashlib.md5(
-            f"admin{self._password}{challenge}".encode()
-        ).hexdigest()
+        response = hashlib.md5(f"admin{self._password}{challenge}".encode()).hexdigest()
         payload = {
             "user": "0",
             "Username": "1",
@@ -468,9 +465,19 @@ class Dell7609Client:
 
         # /status.htm form state
         raw: dict[str, str] = {}
-        for name in ("PJSTATE", "DSP_SOURCE", "ERRORSTA", "FREEZE0", "HIDE0",
-                     "PJSTATE2", "LAMPHR", "ERRORSTA2", "Bright", "Contrast",
-                     "Volume"):
+        for name in (
+            "PJSTATE",
+            "DSP_SOURCE",
+            "ERRORSTA",
+            "FREEZE0",
+            "HIDE0",
+            "PJSTATE2",
+            "LAMPHR",
+            "ERRORSTA2",
+            "Bright",
+            "Contrast",
+            "Volume",
+        ):
             value = _input_value(status, name)
             if value is not None:
                 raw[name] = value
@@ -493,7 +500,7 @@ class Dell7609Client:
         """Rebuild the full form payload the way a browser would submit it."""
         if button not in BUTTON_VALUES:
             raise ValueError(f"Unknown submit button: {button}")
-        base = dict((self.last_state.raw_form if self.last_state else {}))
+        base = dict(self.last_state.raw_form if self.last_state else {})
         if overrides:
             base.update(overrides)
         payload: dict[str, str] = {}
