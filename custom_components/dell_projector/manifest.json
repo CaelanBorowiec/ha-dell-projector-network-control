@@ -1,5 +1,5 @@
 {
-  "domain": "dell_7609wu",
+  "domain": "dell_projector",
   "name": "Dell Projector Network Interface",
   "codeowners": ["@CaelanBorowiec"],
   "config_flow": true,
@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/CaelanBorowiec/ha-dell-projector-network-control/issues",
   "requirements": [],
-  "version": "1.1.1"
+  "version": "2.0.0"
 }
