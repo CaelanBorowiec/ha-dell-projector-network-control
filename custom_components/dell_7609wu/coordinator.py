@@ -47,8 +47,7 @@ class Dell7609Coordinator(DataUpdateCoordinator[ProjectorState]):
     async def _async_update_data(self) -> ProjectorState:
         self._poll_count += 1
         refresh_home = (
-            self._poll_count == 1
-            or self._poll_count % HOME_REFRESH_EVERY_N_POLLS == 0
+            self._poll_count == 1 or self._poll_count % HOME_REFRESH_EVERY_N_POLLS == 0
         )
         try:
             return await self.client.async_get_state(refresh_home=refresh_home)

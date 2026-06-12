@@ -863,9 +863,8 @@ class Dell7609Client:
         use_standby = False
         async with self._state_lock:
             use_standby = self._is_standby_state(self.last_state)
-            needs_prefetch = (
-                not use_standby
-                and (self.last_state is None or not self.last_state.raw_form)
+            needs_prefetch = not use_standby and (
+                self.last_state is None or not self.last_state.raw_form
             )
             if use_standby:
                 payload = self._build_standby_payload(button, overrides)
@@ -890,11 +889,15 @@ class Dell7609Client:
                 else:
                     payload = self._build_payload(button, overrides)
 
-        _LOGGER.debug("Sending %s to %s (%s): %s", button, self._host, payload_mode, payload)
+        _LOGGER.debug(
+            "Sending %s to %s (%s): %s", button, self._host, payload_mode, payload
+        )
         response = await self._request_page("POST", "/tgi/status.tgi", payload)
         async with self._state_lock:
             if use_standby:
-                self._persist_standby_fields(overrides, self._parse_status_form(response))
+                self._persist_standby_fields(
+                    overrides, self._parse_status_form(response)
+                )
             self._apply_command_response(
                 response, optimistic_pjstate2=optimistic_pjstate2
             )
