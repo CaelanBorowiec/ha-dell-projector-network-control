@@ -119,10 +119,8 @@ class DellProjectorSelect(DellProjectorEntity, SelectEntity):
         if not super().available:
             return False
         code = self.entity_description.current_fn(self.coordinator.data)
-        if code is not None and code not in self.entity_description.code_map:
-            # Standby placeholders (e.g. VideoMode=99) are not meaningful values.
-            return False
-        return True
+        # Standby placeholders (e.g. VideoMode=99) are not meaningful values.
+        return code is None or code in self.entity_description.code_map
 
     @property
     def current_option(self) -> str | None:
