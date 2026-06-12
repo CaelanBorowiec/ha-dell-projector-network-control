@@ -1,5 +1,8 @@
 # Dell 7609WU Web Management HTTP Protocol
 
+> This protocol is shared across many Dell projector models; the 7609WU was the
+> reference device used for reverse engineering.
+
 Reverse-engineered reference for the network control interface of the Dell
 7609WU projector (web management "Version: 1.2", firmware `M0R001`). Dell never
 published documentation for this API; everything below was captured from a live

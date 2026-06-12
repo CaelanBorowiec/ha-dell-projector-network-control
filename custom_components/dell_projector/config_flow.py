@@ -13,10 +13,10 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .api import (
-    Dell7609AuthError,
-    Dell7609Client,
-    Dell7609Error,
-    Dell7609UnsupportedError,
+    DellProjectorAuthError,
+    DellProjectorClient,
+    DellProjectorError,
+    DellProjectorUnsupportedError,
     ProjectorState,
 )
 from .const import DOMAIN
@@ -32,7 +32,7 @@ USER_SCHEMA = vol.Schema(
 PASSWORD_SCHEMA = vol.Schema({vol.Optional(CONF_PASSWORD): str})
 
 
-class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
+class DellProjectorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Dell Projector Network Interface."""
 
     VERSION = 1
@@ -41,7 +41,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_host: str | None = None
 
     async def _async_validate(self, host: str, password: str | None) -> ProjectorState:
-        client = Dell7609Client(
+        client = DellProjectorClient(
             host, async_create_clientsession(self.hass), password=password
         )
         return await client.async_validate()
@@ -64,13 +64,13 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             try:
                 state = await self._async_validate(host, password)
-            except Dell7609AuthError as err:
+            except DellProjectorAuthError as err:
                 _LOGGER.warning("Auth failed for %s: %s", host, err)
                 errors["base"] = "invalid_auth"
-            except Dell7609UnsupportedError as err:
+            except DellProjectorUnsupportedError as err:
                 _LOGGER.warning("Unsupported device at %s: %s", host, err)
                 errors["base"] = "not_supported"
-            except Dell7609Error as err:
+            except DellProjectorError as err:
                 _LOGGER.error(
                     "Connection failed for %s (%s): %s",
                     host,
@@ -106,11 +106,11 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
         try:
             state = await self._async_validate(host, None)
-        except Dell7609AuthError:
+        except DellProjectorAuthError:
             # Projector needs a password; continue and ask for it.
             self._discovered_host = host
             return await self.async_step_discovery_confirm()
-        except Dell7609Error:
+        except DellProjectorError:
             # Most Dell OUI matches are not projectors; bail out silently.
             return self.async_abort(reason="not_supported")
         self._discovered_host = host
@@ -128,9 +128,9 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             try:
                 state = await self._async_validate(host, password)
-            except Dell7609AuthError:
+            except DellProjectorAuthError:
                 errors["base"] = "invalid_auth"
-            except Dell7609Error:
+            except DellProjectorError:
                 errors["base"] = "cannot_connect"
             else:
                 return self.async_create_entry(
@@ -157,9 +157,9 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             try:
                 await self._async_validate(entry.data[CONF_HOST], password)
-            except Dell7609AuthError:
+            except DellProjectorAuthError:
                 errors["base"] = "invalid_auth"
-            except Dell7609Error:
+            except DellProjectorError:
                 errors["base"] = "cannot_connect"
             else:
                 return self.async_update_reload_and_abort(
@@ -183,11 +183,11 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             try:
                 state = await self._async_validate(host, password)
-            except Dell7609AuthError:
+            except DellProjectorAuthError:
                 errors["base"] = "invalid_auth"
-            except Dell7609UnsupportedError:
+            except DellProjectorUnsupportedError:
                 errors["base"] = "not_supported"
-            except Dell7609Error:
+            except DellProjectorError:
                 errors["base"] = "cannot_connect"
             else:
                 await self.async_set_unique_id(format_mac(state.mac_address or host))

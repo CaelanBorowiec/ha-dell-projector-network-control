@@ -1,4 +1,4 @@
-"""Standalone smoke test for the Dell 7609WU API client.
+"""Standalone smoke test for the Dell projector API client.
 
 Runs against a live projector without Home Assistant:
 
@@ -20,10 +20,10 @@ from pathlib import Path
 import aiohttp
 
 sys.path.insert(
-    0, str(Path(__file__).resolve().parents[1] / "custom_components" / "dell_7609wu")
+    0, str(Path(__file__).resolve().parents[1] / "custom_components" / "dell_projector")
 )
 
-from api import Dell7609Client, state_as_dict
+from api import DellProjectorClient, state_as_dict
 
 
 async def main() -> int:
@@ -38,7 +38,7 @@ async def main() -> int:
     args = parser.parse_args()
 
     async with aiohttp.ClientSession() as session:
-        client = Dell7609Client(args.host, session, password=args.password)
+        client = DellProjectorClient(args.host, session, password=args.password)
 
         print(f"== Validating projector at {args.host} ==")
         state = await client.async_validate()

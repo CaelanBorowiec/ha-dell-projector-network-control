@@ -1,4 +1,4 @@
-"""Number entities for the Dell 7609WU integration."""
+"""Number entities for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from homeassistant.components.number import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import Dell7609Client, ProjectorState
+from .api import DellProjectorClient, ProjectorState
 from .const import (
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
@@ -22,20 +22,20 @@ from .const import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
-from .coordinator import Dell7609ConfigEntry, Dell7609Coordinator
-from .entity import Dell7609Entity
+from .coordinator import DellProjectorConfigEntry, DellProjectorCoordinator
+from .entity import DellProjectorEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class Dell7609NumberDescription(NumberEntityDescription):
-    """Describes a Dell 7609WU number."""
+class DellProjectorNumberDescription(NumberEntityDescription):
+    """Describes a Dell projector number."""
 
     value_fn: Callable[[ProjectorState], int | None]
-    set_fn: Callable[[Dell7609Client, int], Awaitable[None]]
+    set_fn: Callable[[DellProjectorClient, int], Awaitable[None]]
 
 
-NUMBERS: tuple[Dell7609NumberDescription, ...] = (
-    Dell7609NumberDescription(
+NUMBERS: tuple[DellProjectorNumberDescription, ...] = (
+    DellProjectorNumberDescription(
         key="brightness",
         translation_key="brightness",
         native_min_value=BRIGHTNESS_MIN,
@@ -45,7 +45,7 @@ NUMBERS: tuple[Dell7609NumberDescription, ...] = (
         value_fn=lambda state: state.brightness,
         set_fn=lambda client, value: client.async_set_brightness(value),
     ),
-    Dell7609NumberDescription(
+    DellProjectorNumberDescription(
         key="contrast",
         translation_key="contrast",
         native_min_value=CONTRAST_MIN,
@@ -55,7 +55,7 @@ NUMBERS: tuple[Dell7609NumberDescription, ...] = (
         value_fn=lambda state: state.contrast,
         set_fn=lambda client, value: client.async_set_contrast(value),
     ),
-    Dell7609NumberDescription(
+    DellProjectorNumberDescription(
         key="volume",
         translation_key="volume",
         native_min_value=VOLUME_MIN,
@@ -70,25 +70,25 @@ NUMBERS: tuple[Dell7609NumberDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: Dell7609ConfigEntry,
+    entry: DellProjectorConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up numbers."""
     coordinator = entry.runtime_data
     async_add_entities(
-        Dell7609Number(coordinator, description) for description in NUMBERS
+        DellProjectorNumber(coordinator, description) for description in NUMBERS
     )
 
 
-class Dell7609Number(Dell7609Entity, NumberEntity):
+class DellProjectorNumber(DellProjectorEntity, NumberEntity):
     """A projector number control."""
 
-    entity_description: Dell7609NumberDescription
+    entity_description: DellProjectorNumberDescription
 
     def __init__(
         self,
-        coordinator: Dell7609Coordinator,
-        description: Dell7609NumberDescription,
+        coordinator: DellProjectorCoordinator,
+        description: DellProjectorNumberDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

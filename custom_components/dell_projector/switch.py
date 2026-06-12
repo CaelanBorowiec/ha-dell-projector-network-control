@@ -1,4 +1,4 @@
-"""Switch entities for the Dell 7609WU integration."""
+"""Switch entities for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -13,23 +13,23 @@ from homeassistant.components.switch import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import Dell7609Client, ProjectorState
-from .coordinator import Dell7609ConfigEntry, Dell7609Coordinator
-from .entity import Dell7609Entity
+from .api import DellProjectorClient, ProjectorState
+from .coordinator import DellProjectorConfigEntry, DellProjectorCoordinator
+from .entity import DellProjectorEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class Dell7609SwitchDescription(SwitchEntityDescription):
-    """Describes a Dell 7609WU switch."""
+class DellProjectorSwitchDescription(SwitchEntityDescription):
+    """Describes a Dell projector switch."""
 
     is_on_fn: Callable[[ProjectorState], bool | None]
-    turn_on_fn: Callable[[Dell7609Client], Awaitable[None]]
-    turn_off_fn: Callable[[Dell7609Client], Awaitable[None]]
+    turn_on_fn: Callable[[DellProjectorClient], Awaitable[None]]
+    turn_off_fn: Callable[[DellProjectorClient], Awaitable[None]]
     skip_refresh: bool = False
 
 
-SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
-    Dell7609SwitchDescription(
+SWITCHES: tuple[DellProjectorSwitchDescription, ...] = (
+    DellProjectorSwitchDescription(
         key="power",
         translation_key="power",
         device_class=SwitchDeviceClass.SWITCH,
@@ -38,7 +38,7 @@ SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
         turn_off_fn=lambda client: client.async_power_off(),
         skip_refresh=True,
     ),
-    Dell7609SwitchDescription(
+    DellProjectorSwitchDescription(
         key="blank_screen",
         translation_key="blank_screen",
         device_class=SwitchDeviceClass.SWITCH,
@@ -47,7 +47,7 @@ SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
         turn_off_fn=lambda client: client.async_set_blank_screen(False),
         skip_refresh=True,
     ),
-    Dell7609SwitchDescription(
+    DellProjectorSwitchDescription(
         key="eco_mode",
         translation_key="eco_mode",
         device_class=SwitchDeviceClass.SWITCH,
@@ -60,25 +60,25 @@ SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: Dell7609ConfigEntry,
+    entry: DellProjectorConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up switches."""
     coordinator = entry.runtime_data
     async_add_entities(
-        Dell7609Switch(coordinator, description) for description in SWITCHES
+        DellProjectorSwitch(coordinator, description) for description in SWITCHES
     )
 
 
-class Dell7609Switch(Dell7609Entity, SwitchEntity):
+class DellProjectorSwitch(DellProjectorEntity, SwitchEntity):
     """A projector switch."""
 
-    entity_description: Dell7609SwitchDescription
+    entity_description: DellProjectorSwitchDescription
 
     def __init__(
         self,
-        coordinator: Dell7609Coordinator,
-        description: Dell7609SwitchDescription,
+        coordinator: DellProjectorCoordinator,
+        description: DellProjectorSwitchDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

@@ -1,4 +1,4 @@
-"""Diagnostics support for the Dell 7609WU integration."""
+"""Diagnostics support for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
 from .api import state_as_dict
-from .coordinator import Dell7609ConfigEntry
+from .coordinator import DellProjectorConfigEntry
 
 TO_REDACT = {CONF_PASSWORD, "mac_address"}
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: Dell7609ConfigEntry
+    hass: HomeAssistant, entry: DellProjectorConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data

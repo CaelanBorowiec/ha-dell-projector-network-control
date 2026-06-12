@@ -1,4 +1,4 @@
-"""Async client for the Dell 7609WU projector web management interface.
+"""Async client for the Dell projector web management interface.
 
 The projector (2008-era firmware) exposes no JSON API. Everything goes through
 its tiny HTTP/1.0 web server:
@@ -181,20 +181,20 @@ _STANDBY_DEFAULTS: dict[str, str] = {
 }
 
 
-class Dell7609Error(Exception):
-    """Base error for the Dell 7609WU client."""
+class DellProjectorError(Exception):
+    """Base error for the Dell projector client."""
 
 
-class Dell7609ConnectionError(Dell7609Error):
+class DellProjectorConnectionError(DellProjectorError):
     """Could not reach the projector or got an unusable response."""
 
 
-class Dell7609AuthError(Dell7609Error):
+class DellProjectorAuthError(DellProjectorError):
     """Login required or rejected."""
 
 
-class Dell7609UnsupportedError(Dell7609Error):
-    """The host is reachable but is not a Dell 7609WU web management UI."""
+class DellProjectorUnsupportedError(DellProjectorError):
+    """The host is reachable but is not a Dell projector web management UI."""
 
 
 @dataclass
@@ -372,7 +372,7 @@ def _home_value(html: str, label: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-class Dell7609Client:
+class DellProjectorClient:
     """Client for one projector, identified by host (IP), optional password."""
 
     def __init__(
@@ -470,11 +470,11 @@ class Dell7609Client:
                 if attempt + 1 < max_attempts:
                     continue
             except aiohttp.ClientError as err:
-                raise Dell7609ConnectionError(
+                raise DellProjectorConnectionError(
                     f"Error talking to projector at {self._host}: {err}"
                 ) from err
         assert last_timeout is not None
-        raise Dell7609ConnectionError(
+        raise DellProjectorConnectionError(
             f"Timeout talking to projector at {self._host}"
         ) from last_timeout
 
@@ -491,7 +491,7 @@ class Dell7609Client:
         self._cookie = None
         text, _ = await self._raw_request("GET", "/")
         if "Web Management" not in text:
-            raise Dell7609UnsupportedError(
+            raise DellProjectorUnsupportedError(
                 f"Host {self._host} does not look like a supported Dell "
                 "web management interface"
             )
@@ -508,7 +508,7 @@ class Dell7609Client:
     async def _async_login(self) -> None:
         """Authenticate the session cookie via MD5 challenge-response."""
         if not self._password:
-            raise Dell7609AuthError(
+            raise DellProjectorAuthError(
                 f"Projector at {self._host} requires an admin password"
             )
         text, _ = await self._raw_request("GET", "/login.htm")
@@ -521,7 +521,7 @@ class Dell7609Client:
                 r'"Challenge"[^>]*VALUE\s*=\s*\n?"([^"]*)"', text, re.DOTALL
             )
         if not match:
-            raise Dell7609ConnectionError(
+            raise DellProjectorConnectionError(
                 f"Could not find login challenge on projector at {self._host}"
             )
         challenge = match.group(1)
@@ -536,7 +536,7 @@ class Dell7609Client:
         }
         text, _ = await self._raw_request("POST", "/tgi/login.tgi", payload)
         if self._is_login_page(text):
-            raise Dell7609AuthError(
+            raise DellProjectorAuthError(
                 f"Projector at {self._host} rejected the admin password"
             )
 
@@ -558,11 +558,11 @@ class Dell7609Client:
             await self._async_login()
         text, _ = await self._raw_request(method, path, data)
         if self._is_login_page(text):
-            raise Dell7609AuthError(
+            raise DellProjectorAuthError(
                 f"Projector at {self._host} requires a valid admin password"
             )
         if path != "/" and self._is_frameset(text):
-            raise Dell7609ConnectionError(
+            raise DellProjectorConnectionError(
                 f"Projector at {self._host} keeps returning the frameset; "
                 "session could not be established"
             )
@@ -581,7 +581,7 @@ class Dell7609Client:
                 timeout=_OPTIONAL_STATUS_TIMEOUT,
                 max_attempts=1,
             )
-        except Dell7609ConnectionError:
+        except DellProjectorConnectionError:
             return None
         if self._is_login_page(text) or self._is_frameset(text):
             return None
@@ -615,7 +615,7 @@ class Dell7609Client:
                 timeout=timeout,
                 max_attempts=max_attempts,
             )
-        except Dell7609ConnectionError:
+        except DellProjectorConnectionError:
             return None
         if self._is_login_page(text) or self._is_frameset(text):
             await self._bootstrap_session()
@@ -626,7 +626,7 @@ class Dell7609Client:
                     timeout=_OPTIONAL_STATUS_TIMEOUT,
                     max_attempts=1,
                 )
-            except Dell7609ConnectionError:
+            except DellProjectorConnectionError:
                 return None
             if self._is_login_page(text) or self._is_frameset(text):
                 return None
@@ -663,7 +663,7 @@ class Dell7609Client:
                         status_partial = True
                         state = self.apply_power_hold_overlay(base)
                     else:
-                        raise Dell7609ConnectionError(
+                        raise DellProjectorConnectionError(
                             f"Timeout talking to projector at {self._host}"
                         )
                 else:
@@ -976,8 +976,8 @@ class Dell7609Client:
     async def async_validate(self) -> ProjectorState:
         """Validate connectivity, device type and credentials.
 
-        Raises Dell7609UnsupportedError, Dell7609AuthError or
-        Dell7609ConnectionError accordingly. Returns the current state.
+        Raises DellProjectorUnsupportedError, DellProjectorAuthError or
+        DellProjectorConnectionError accordingly. Returns the current state.
         """
         try:
             landing = await self._bootstrap_session()
@@ -990,7 +990,7 @@ class Dell7609Client:
                     home, status, preserve_form=status is None
                 )
                 self.last_state = state
-        except Dell7609Error:
+        except DellProjectorError:
             raise
         return state
 

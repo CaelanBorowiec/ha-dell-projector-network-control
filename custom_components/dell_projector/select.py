@@ -1,4 +1,4 @@
-"""Select entities for the Dell 7609WU integration."""
+"""Select entities for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import Dell7609Client, ProjectorState
+from .api import DellProjectorClient, ProjectorState
 from .const import (
     ASPECT_CODES,
     ASPECT_NAMES_TO_CODES,
@@ -23,22 +23,22 @@ from .const import (
     VIDEO_MODE_CODES,
     VIDEO_MODE_NAMES_TO_CODES,
 )
-from .coordinator import Dell7609ConfigEntry, Dell7609Coordinator
-from .entity import Dell7609Entity
+from .coordinator import DellProjectorConfigEntry, DellProjectorCoordinator
+from .entity import DellProjectorEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class Dell7609SelectDescription(SelectEntityDescription):
-    """Describes a Dell 7609WU select."""
+class DellProjectorSelectDescription(SelectEntityDescription):
+    """Describes a Dell projector select."""
 
     current_fn: Callable[[ProjectorState], int | None]
     code_map: dict[int, str]
     name_map: dict[str, int]
-    select_fn: Callable[[Dell7609Client, int], Awaitable[None]]
+    select_fn: Callable[[DellProjectorClient, int], Awaitable[None]]
 
 
-SELECTS: tuple[Dell7609SelectDescription, ...] = (
-    Dell7609SelectDescription(
+SELECTS: tuple[DellProjectorSelectDescription, ...] = (
+    DellProjectorSelectDescription(
         key="source",
         translation_key="source",
         current_fn=lambda state: state.source_code,
@@ -46,7 +46,7 @@ SELECTS: tuple[Dell7609SelectDescription, ...] = (
         name_map=SOURCE_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_source(code),
     ),
-    Dell7609SelectDescription(
+    DellProjectorSelectDescription(
         key="video_mode",
         translation_key="video_mode",
         current_fn=lambda state: state.video_mode,
@@ -54,7 +54,7 @@ SELECTS: tuple[Dell7609SelectDescription, ...] = (
         name_map=VIDEO_MODE_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_video_mode(code),
     ),
-    Dell7609SelectDescription(
+    DellProjectorSelectDescription(
         key="aspect_ratio",
         translation_key="aspect_ratio",
         current_fn=lambda state: state.aspect,
@@ -62,7 +62,7 @@ SELECTS: tuple[Dell7609SelectDescription, ...] = (
         name_map=ASPECT_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_aspect(code),
     ),
-    Dell7609SelectDescription(
+    DellProjectorSelectDescription(
         key="projection_mode",
         translation_key="projection_mode",
         entity_category=EntityCategory.CONFIG,
@@ -71,7 +71,7 @@ SELECTS: tuple[Dell7609SelectDescription, ...] = (
         name_map=PROJECTION_MODE_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_projection_mode(code),
     ),
-    Dell7609SelectDescription(
+    DellProjectorSelectDescription(
         key="power_saving",
         translation_key="power_saving",
         entity_category=EntityCategory.CONFIG,
@@ -85,25 +85,25 @@ SELECTS: tuple[Dell7609SelectDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: Dell7609ConfigEntry,
+    entry: DellProjectorConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up selects."""
     coordinator = entry.runtime_data
     async_add_entities(
-        Dell7609Select(coordinator, description) for description in SELECTS
+        DellProjectorSelect(coordinator, description) for description in SELECTS
     )
 
 
-class Dell7609Select(Dell7609Entity, SelectEntity):
+class DellProjectorSelect(DellProjectorEntity, SelectEntity):
     """A projector select."""
 
-    entity_description: Dell7609SelectDescription
+    entity_description: DellProjectorSelectDescription
 
     def __init__(
         self,
-        coordinator: Dell7609Coordinator,
-        description: Dell7609SelectDescription,
+        coordinator: DellProjectorCoordinator,
+        description: DellProjectorSelectDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

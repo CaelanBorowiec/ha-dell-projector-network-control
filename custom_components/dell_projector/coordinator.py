@@ -1,4 +1,4 @@
-"""Data update coordinator for the Dell 7609WU integration."""
+"""Data update coordinator for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -11,28 +11,28 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
-    Dell7609AuthError,
-    Dell7609Client,
-    Dell7609Error,
+    DellProjectorAuthError,
+    DellProjectorClient,
+    DellProjectorError,
     ProjectorState,
 )
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN, HOME_REFRESH_EVERY_N_POLLS
 
 _LOGGER = logging.getLogger(__name__)
 
-type Dell7609ConfigEntry = ConfigEntry[Dell7609Coordinator]
+type DellProjectorConfigEntry = ConfigEntry[DellProjectorCoordinator]
 
 
-class Dell7609Coordinator(DataUpdateCoordinator[ProjectorState]):
+class DellProjectorCoordinator(DataUpdateCoordinator[ProjectorState]):
     """Polls home.htm + status.htm and exposes the parsed state."""
 
-    config_entry: Dell7609ConfigEntry
+    config_entry: DellProjectorConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: Dell7609ConfigEntry,
-        client: Dell7609Client,
+        entry: DellProjectorConfigEntry,
+        client: DellProjectorClient,
     ) -> None:
         super().__init__(
             hass,
@@ -51,9 +51,9 @@ class Dell7609Coordinator(DataUpdateCoordinator[ProjectorState]):
         )
         try:
             return await self.client.async_get_state(refresh_home=refresh_home)
-        except Dell7609AuthError as err:
+        except DellProjectorAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
-        except Dell7609Error as err:
+        except DellProjectorError as err:
             if self.client.last_state is not None:
                 _LOGGER.debug(
                     "Poll failed for %s, keeping last state: %s",
@@ -67,7 +67,7 @@ class Dell7609Coordinator(DataUpdateCoordinator[ProjectorState]):
         """Run a client command coroutine, then refresh state."""
         try:
             await coro
-        except Dell7609AuthError as err:
+        except DellProjectorAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         if skip_refresh and self.client.last_state is not None:
             state = self.client.apply_power_hold_overlay(self.client.last_state)

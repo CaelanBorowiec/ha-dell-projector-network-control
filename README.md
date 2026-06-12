@@ -88,8 +88,21 @@ actually a projector), but adding one manually by IP always works.
 
 ### Manual
 
-Copy `custom_components/dell_7609wu/` into your Home Assistant
+Copy `custom_components/dell_projector/` into your Home Assistant
 `config/custom_components/` directory and restart.
+
+## Upgrading from v1.x
+
+Version 2.0.0 renames the integration domain from `dell_7609wu` to
+`dell_projector`. This is a breaking change:
+
+1. Remove the old integration (Settings → Devices & Services → delete each
+   projector entry).
+2. Delete `custom_components/dell_7609wu/` from your Home Assistant config.
+3. Install or copy `custom_components/dell_projector/` and restart.
+4. Re-add your projectors (DHCP discovery still works).
+5. Update automations and scripts: entity IDs change from
+   `*.dell_7609wu_*` to `*.dell_projector_*`.
 
 ## Setup
 
@@ -105,14 +118,14 @@ Repeat for each projector.
 
 | Path | Purpose |
 |---|---|
-| `custom_components/dell_7609wu/` | the Home Assistant integration |
-| `docs/PROTOCOL.md` | reverse-engineered HTTP API reference for the 7609WU |
+| `custom_components/dell_projector/` | the Home Assistant integration |
+| `docs/PROTOCOL.md` | reverse-engineered HTTP API reference (7609WU reference device) |
 | `tools/api-tester.html` | standalone test page. Open it in a browser, point it at a projector, and fire raw commands |
 | `tools/smoke_test.py` | CLI test of the API client (`python tools/smoke_test.py <ip> [--password X] [--command]`) |
 
 ## Notes and limitations
 
-The 7609WU's web server is HTTP/1.0 from 2008. There's one session cookie
+These projectors' web server is HTTP/1.0 from 2008. There's one session cookie
 (`ATOP`), state is scraped from HTML, and commands are full form posts. The
 integration replays exactly what a browser would send, so read the protocol
 doc before changing any of the payload handling.
@@ -126,7 +139,7 @@ login uses unsalted MD5. Treat it as a convenience lock, not real security.
 
 Getting into the HACS default store also requires a repo description and
 topics on GitHub. Brand icons ship inline in
-`custom_components/dell_7609wu/brand/` (required for HACS validation since
+`custom_components/dell_projector/brand/` (required for HACS validation since
 Home Assistant 2026.3). Until then, install it as a custom repository as
 described above.
 
