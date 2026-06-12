@@ -17,6 +17,7 @@ class DellProjectorEntity(CoordinatorEntity[DellProjectorCoordinator]):
     """Base entity tied to one projector."""
 
     _attr_has_entity_name = True
+    _requires_lamp_on: bool = False
 
     def __init__(self, coordinator: DellProjectorCoordinator, key: str) -> None:
         super().__init__(coordinator)
@@ -39,3 +40,10 @@ class DellProjectorEntity(CoordinatorEntity[DellProjectorCoordinator]):
             sw_version=state.firmware_version,
             configuration_url=f"http://{coordinator.client.host}/",
         )
+
+    @property
+    def available(self) -> bool:
+        """Runtime controls are inactive while the lamp is off."""
+        if self._requires_lamp_on and not self.coordinator.data.is_on:
+            return False
+        return super().available

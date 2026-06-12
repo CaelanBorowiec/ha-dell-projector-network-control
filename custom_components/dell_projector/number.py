@@ -32,6 +32,7 @@ class DellProjectorNumberDescription(NumberEntityDescription):
 
     value_fn: Callable[[ProjectorState], int | None]
     set_fn: Callable[[DellProjectorClient, int], Awaitable[None]]
+    requires_lamp_on: bool = False
 
 
 NUMBERS: tuple[DellProjectorNumberDescription, ...] = (
@@ -44,6 +45,7 @@ NUMBERS: tuple[DellProjectorNumberDescription, ...] = (
         mode=NumberMode.SLIDER,
         value_fn=lambda state: state.brightness,
         set_fn=lambda client, value: client.async_set_brightness(value),
+        requires_lamp_on=True,
     ),
     DellProjectorNumberDescription(
         key="contrast",
@@ -54,6 +56,7 @@ NUMBERS: tuple[DellProjectorNumberDescription, ...] = (
         mode=NumberMode.SLIDER,
         value_fn=lambda state: state.contrast,
         set_fn=lambda client, value: client.async_set_contrast(value),
+        requires_lamp_on=True,
     ),
     DellProjectorNumberDescription(
         key="volume",
@@ -64,6 +67,7 @@ NUMBERS: tuple[DellProjectorNumberDescription, ...] = (
         mode=NumberMode.SLIDER,
         value_fn=lambda state: state.volume,
         set_fn=lambda client, value: client.async_set_volume(value),
+        requires_lamp_on=True,
     ),
 )
 
@@ -92,6 +96,7 @@ class DellProjectorNumber(DellProjectorEntity, NumberEntity):
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
+        self._requires_lamp_on = description.requires_lamp_on
 
     @property
     def native_value(self) -> int | None:

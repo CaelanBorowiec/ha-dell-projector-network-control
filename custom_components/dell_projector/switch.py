@@ -26,6 +26,7 @@ class DellProjectorSwitchDescription(SwitchEntityDescription):
     turn_on_fn: Callable[[DellProjectorClient], Awaitable[None]]
     turn_off_fn: Callable[[DellProjectorClient], Awaitable[None]]
     skip_refresh: bool = False
+    requires_lamp_on: bool = False
 
 
 SWITCHES: tuple[DellProjectorSwitchDescription, ...] = (
@@ -46,6 +47,7 @@ SWITCHES: tuple[DellProjectorSwitchDescription, ...] = (
         turn_on_fn=lambda client: client.async_set_blank_screen(True),
         turn_off_fn=lambda client: client.async_set_blank_screen(False),
         skip_refresh=True,
+        requires_lamp_on=True,
     ),
     DellProjectorSwitchDescription(
         key="eco_mode",
@@ -82,6 +84,7 @@ class DellProjectorSwitch(DellProjectorEntity, SwitchEntity):
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
+        self._requires_lamp_on = description.requires_lamp_on
 
     @property
     def is_on(self) -> bool | None:

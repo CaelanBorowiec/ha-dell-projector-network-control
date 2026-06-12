@@ -35,6 +35,7 @@ class DellProjectorSelectDescription(SelectEntityDescription):
     code_map: dict[int, str]
     name_map: dict[str, int]
     select_fn: Callable[[DellProjectorClient, int], Awaitable[None]]
+    requires_lamp_on: bool = False
 
 
 SELECTS: tuple[DellProjectorSelectDescription, ...] = (
@@ -45,6 +46,7 @@ SELECTS: tuple[DellProjectorSelectDescription, ...] = (
         code_map=SOURCE_CODES,
         name_map=SOURCE_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_source(code),
+        requires_lamp_on=True,
     ),
     DellProjectorSelectDescription(
         key="video_mode",
@@ -53,6 +55,7 @@ SELECTS: tuple[DellProjectorSelectDescription, ...] = (
         code_map=VIDEO_MODE_CODES,
         name_map=VIDEO_MODE_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_video_mode(code),
+        requires_lamp_on=True,
     ),
     DellProjectorSelectDescription(
         key="aspect_ratio",
@@ -61,6 +64,7 @@ SELECTS: tuple[DellProjectorSelectDescription, ...] = (
         code_map=ASPECT_CODES,
         name_map=ASPECT_NAMES_TO_CODES,
         select_fn=lambda client, code: client.async_set_aspect(code),
+        requires_lamp_on=True,
     ),
     DellProjectorSelectDescription(
         key="projection_mode",
@@ -107,7 +111,18 @@ class DellProjectorSelect(DellProjectorEntity, SelectEntity):
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
+        self._requires_lamp_on = description.requires_lamp_on
         self._attr_options = list(description.code_map.values())
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        code = self.entity_description.current_fn(self.coordinator.data)
+        if code is not None and code not in self.entity_description.code_map:
+            # Standby placeholders (e.g. VideoMode=99) are not meaningful values.
+            return False
+        return True
 
     @property
     def current_option(self) -> str | None:
