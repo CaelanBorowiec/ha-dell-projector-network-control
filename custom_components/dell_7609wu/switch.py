@@ -25,6 +25,7 @@ class Dell7609SwitchDescription(SwitchEntityDescription):
     is_on_fn: Callable[[ProjectorState], bool | None]
     turn_on_fn: Callable[[Dell7609Client], Awaitable[None]]
     turn_off_fn: Callable[[Dell7609Client], Awaitable[None]]
+    skip_refresh: bool = False
 
 
 SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
@@ -35,6 +36,7 @@ SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
         is_on_fn=lambda state: state.is_on,
         turn_on_fn=lambda client: client.async_power_on(),
         turn_off_fn=lambda client: client.async_power_off(),
+        skip_refresh=True,
     ),
     Dell7609SwitchDescription(
         key="blank_screen",
@@ -43,6 +45,7 @@ SWITCHES: tuple[Dell7609SwitchDescription, ...] = (
         is_on_fn=lambda state: state.blank_screen,
         turn_on_fn=lambda client: client.async_set_blank_screen(True),
         turn_off_fn=lambda client: client.async_set_blank_screen(False),
+        skip_refresh=True,
     ),
     Dell7609SwitchDescription(
         key="eco_mode",
@@ -86,10 +89,12 @@ class Dell7609Switch(Dell7609Entity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         await self.coordinator.async_send_command(
-            self.entity_description.turn_on_fn(self.coordinator.client)
+            self.entity_description.turn_on_fn(self.coordinator.client),
+            skip_refresh=self.entity_description.skip_refresh,
         )
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.coordinator.async_send_command(
-            self.entity_description.turn_off_fn(self.coordinator.client)
+            self.entity_description.turn_off_fn(self.coordinator.client),
+            skip_refresh=self.entity_description.skip_refresh,
         )

@@ -8,7 +8,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
@@ -42,7 +42,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _async_validate(self, host: str, password: str | None) -> ProjectorState:
         client = Dell7609Client(
-            host, async_get_clientsession(self.hass), password=password
+            host, async_create_clientsession(self.hass), password=password
         )
         return await client.async_validate()
 
@@ -64,11 +64,19 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             try:
                 state = await self._async_validate(host, password)
-            except Dell7609AuthError:
+            except Dell7609AuthError as err:
+                _LOGGER.warning("Auth failed for %s: %s", host, err)
                 errors["base"] = "invalid_auth"
-            except Dell7609UnsupportedError:
+            except Dell7609UnsupportedError as err:
+                _LOGGER.warning("Unsupported device at %s: %s", host, err)
                 errors["base"] = "not_supported"
-            except Dell7609Error:
+            except Dell7609Error as err:
+                _LOGGER.error(
+                    "Connection failed for %s (%s): %s",
+                    host,
+                    type(err).__name__,
+                    err,
+                )
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected error validating %s", host)

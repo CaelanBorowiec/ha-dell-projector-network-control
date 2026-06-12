@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
-from dataclasses import dataclass
-from dataclasses import field as dc_field
+import time
+from dataclasses import dataclass, field as dc_field, replace
+from pathlib import Path
 from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlencode
@@ -33,10 +35,40 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
+# region agent log
+def _debug_log(
+    hypothesis_id: str, location: str, message: str, data: dict[str, Any]
+) -> None:
+    payload = {
+        "sessionId": "af4035",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    line = json.dumps(payload) + "\n"
+    for log_path in (
+        Path(__file__).resolve().parents[2] / "debug-af4035.log",
+        Path(__file__).resolve().parent / "debug-af4035.log",
+    ):
+        try:
+            with log_path.open("a", encoding="utf-8") as log_file:
+                log_file.write(line)
+            break
+        except OSError:
+            continue
+
+
+# endregion
+
 _LOGIN_FORM_MARKER = "/tgi/login.tgi"
 _FRAMESET_MARKER = "<frameset"
 
-_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=15)
+# The firmware web server is single-threaded; allow headroom but fail before
+# blocking the coordinator (and user commands) for minutes.
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
+_OPTIONAL_STATUS_TIMEOUT = aiohttp.ClientTimeout(total=15, connect=5)
 
 # Submit buttons of the /status.htm form with their exact firmware values.
 # Trailing spaces are significant: the firmware string-matches these.
@@ -104,6 +136,77 @@ ECO_MODE_OFF = 28
 HIDE_ON = 85
 HIDE_OFF = 170
 
+# After power on/off the firmware may still report the previous PJSTATE2 for minutes.
+_POWER_HOLD_SECONDS = 120
+
+# Standby /status.htm uses a smaller form than lamp-on (browser-captured).
+_STANDBY_FORM_ORDER: tuple[str, ...] = (
+    "PJSTATE",
+    "DSP_SOURCE",
+    "ERRORSTA",
+    "FREEZE0",
+    "HIDE0",
+    "PJSTATE2",
+    "PowerOn",
+    "PowerOff",
+    "PwSave",
+    "btnPwSave",
+    "LAMPHR",
+    "ERRORSTA2",
+    "ecoMode",
+    "btnECOMode",
+    "PrjMode",
+    "btnPrjMode",
+    "PrjSRC",
+    "btnSource",
+    "VideoMode",
+    "btnVideo",
+    "hide",
+    "btnHide",
+    "Aspect",
+    "btnAspect",
+    "Bright",
+    "Contrast",
+    "Volume",
+    "btnVol",
+)
+_STANDBY_ALWAYS: frozenset[str] = frozenset(
+    {
+        "PJSTATE",
+        "DSP_SOURCE",
+        "ERRORSTA",
+        "FREEZE0",
+        "HIDE0",
+        "PJSTATE2",
+        "PwSave",
+        "LAMPHR",
+        "ERRORSTA2",
+        "PrjMode",
+        "PrjSRC",
+        "VideoMode",
+        "Bright",
+        "Contrast",
+        "Volume",
+    }
+)
+_STANDBY_DEFAULTS: dict[str, str] = {
+    "PJSTATE": "0",
+    "DSP_SOURCE": "0",
+    "ERRORSTA": "Standby ",
+    "FREEZE0": "",
+    "HIDE0": "0",
+    "PJSTATE2": "Standby ",
+    "PwSave": "99",
+    "LAMPHR": "0 hr.",
+    "ERRORSTA2": "",
+    "PrjMode": "99",
+    "PrjSRC": "0",
+    "VideoMode": "99",
+    "Bright": "0",
+    "Contrast": "0",
+    "Volume": "0",
+}
+
 
 class Dell7609Error(Exception):
     """Base error for the Dell 7609WU client."""
@@ -158,8 +261,18 @@ class ProjectorState:
     @property
     def is_on(self) -> bool:
         """True when the lamp is on or warming up."""
-        status = (self.power_status or "").lower()
-        return "on" in status or "warm" in status
+        status = (self.power_status or "").strip().lower()
+        if not status:
+            return False
+        # Explicit strings — avoid `"on" in status` which falsely matches "Cooling".
+        if status.startswith("standby") or "cooling" in status:
+            return False
+        if "power saving" in status:
+            return False
+        if "warm" in status or "lamp on" in status:
+            return True
+        code = self._raw_int("PJSTATE")
+        return code == 1 if code is not None else False
 
     @property
     def source_code(self) -> int | None:
@@ -299,12 +412,43 @@ class Dell7609Client:
         self._session = session
         self._password = password or None
         self._cookie: str | None = None
-        self._lock = asyncio.Lock()
+        self._state_lock = asyncio.Lock()
+        self._http_lock = asyncio.Lock()
         self.last_state: ProjectorState | None = None
+        self._power_hold_is_on: bool | None = None
+        self._power_hold_until: float = 0.0
+        # Accumulated standby form values (mirrors browser session state).
+        self._standby_form: dict[str, str] = {}
 
     @property
     def host(self) -> str:
         return self._host
+
+    def set_power_hold(self, is_on: bool) -> None:
+        """Keep switch state stable while the lamp warms up or cools down."""
+        self._power_hold_is_on = is_on
+        self._power_hold_until = time.monotonic() + _POWER_HOLD_SECONDS
+
+    def apply_power_hold_overlay(self, state: ProjectorState) -> ProjectorState:
+        """Mask stale PJSTATE2 reads during a power transition."""
+        if self._power_hold_is_on is None or time.monotonic() >= self._power_hold_until:
+            self._power_hold_is_on = None
+            return state
+        pj = (state.power_status or "").strip().lower()
+        if self._power_hold_is_on and "lamp on" in pj:
+            self._power_hold_is_on = None
+            return state
+        if not self._power_hold_is_on and pj.startswith("standby"):
+            self._power_hold_is_on = None
+            return state
+        raw = dict(state.raw_form)
+        if self._power_hold_is_on:
+            raw["PJSTATE2"] = "Warm up "
+            raw["PJSTATE"] = "1"
+        else:
+            raw["PJSTATE2"] = "Cooling "
+            raw["PJSTATE"] = "0"
+        return replace(state, raw_form=raw)
 
     def _url(self, path: str) -> str:
         return f"http://{self._host}{path}"
@@ -312,7 +456,13 @@ class Dell7609Client:
     # ---- low level HTTP ------------------------------------------------------
 
     async def _raw_request(
-        self, method: str, path: str, data: dict[str, str] | None = None
+        self,
+        method: str,
+        path: str,
+        data: dict[str, str] | None = None,
+        *,
+        timeout: aiohttp.ClientTimeout | None = None,
+        max_attempts: int = 2,
     ) -> tuple[str, aiohttp.ClientResponse]:
         headers: dict[str, str] = {}
         if self._cookie:
@@ -321,25 +471,90 @@ class Dell7609Client:
         if data is not None:
             body = urlencode(data)  # quote_plus: spaces become '+', like a browser
             headers["Content-Type"] = "application/x-www-form-urlencoded"
-        try:
-            async with self._session.request(
-                method,
-                self._url(path),
-                data=body,
-                headers=headers,
-                timeout=_REQUEST_TIMEOUT,
-            ) as resp:
-                text = await resp.text(errors="replace")
-                self._store_cookie(resp)
-                return text, resp
-        except TimeoutError as err:
-            raise Dell7609ConnectionError(
-                f"Timeout talking to projector at {self._host}"
-            ) from err
-        except aiohttp.ClientError as err:
-            raise Dell7609ConnectionError(
-                f"Error talking to projector at {self._host}: {err}"
-            ) from err
+        effective_timeout = timeout or _REQUEST_TIMEOUT
+        last_timeout: TimeoutError | None = None
+        referer = {
+            "/tgi/status.tgi": "/status.htm",
+            "/tgi/password.tgi": "/password.htm",
+        }.get(path)
+        for attempt in range(max_attempts):
+            try:
+                async with self._http_lock:
+                    if referer:
+                        headers["Referer"] = self._url(referer)
+                    async with self._session.request(
+                        method,
+                        self._url(path),
+                        data=body,
+                        headers=headers,
+                        timeout=effective_timeout,
+                    ) as resp:
+                        text = await resp.text(errors="replace")
+                        set_cookie = resp.headers.getall("Set-Cookie", [])
+                        cookie_before = self._cookie
+                        self._store_cookie(resp)
+                        # region agent log
+                        _debug_log(
+                            "B",
+                            "api.py:_raw_request",
+                            "HTTP response",
+                            {
+                                "host": self._host,
+                                "method": method,
+                                "path": path,
+                                "attempt": attempt + 1,
+                                "status": resp.status,
+                                "setCookieCount": len(set_cookie),
+                                "cookieBefore": cookie_before is not None,
+                                "cookieAfter": self._cookie is not None,
+                                "textLen": len(text),
+                                "isFrameset": _FRAMESET_MARKER in text.lower(),
+                                "isLoginPage": _LOGIN_FORM_MARKER in text,
+                            },
+                        )
+                        # endregion
+                        return text, resp
+            except TimeoutError as err:
+                last_timeout = err
+                # region agent log
+                _debug_log(
+                    "A",
+                    "api.py:_raw_request",
+                    "Request timeout",
+                    {
+                        "host": self._host,
+                        "method": method,
+                        "path": path,
+                        "attempt": attempt + 1,
+                        "willRetry": attempt + 1 < max_attempts,
+                        "error": str(err),
+                    },
+                )
+                # endregion
+                if attempt + 1 < max_attempts:
+                    continue
+            except aiohttp.ClientError as err:
+                # region agent log
+                _debug_log(
+                    "A",
+                    "api.py:_raw_request",
+                    "Client error",
+                    {
+                        "host": self._host,
+                        "method": method,
+                        "path": path,
+                        "errorType": type(err).__name__,
+                        "error": str(err),
+                    },
+                )
+                # endregion
+                raise Dell7609ConnectionError(
+                    f"Error talking to projector at {self._host}: {err}"
+                ) from err
+        assert last_timeout is not None
+        raise Dell7609ConnectionError(
+            f"Timeout talking to projector at {self._host}"
+        ) from last_timeout
 
     def _store_cookie(self, resp: aiohttp.ClientResponse) -> None:
         # aiohttp's cookie jar refuses bare-IP hosts, so track ATOP manually.
@@ -353,6 +568,19 @@ class Dell7609Client:
         """Fetch / to obtain the ATOP session cookie; returns the page."""
         self._cookie = None
         text, _ = await self._raw_request("GET", "/")
+        # region agent log
+        _debug_log(
+            "C",
+            "api.py:_bootstrap_session",
+            "Bootstrap landing page",
+            {
+                "host": self._host,
+                "hasWebManagement": "Web Management" in text,
+                "hasCookie": self._cookie is not None,
+                "isLoginPage": self._is_login_page(text),
+            },
+        )
+        # endregion
         if "Web Management" not in text:
             raise Dell7609UnsupportedError(
                 f"Host {self._host} does not look like a supported Dell "
@@ -413,6 +641,21 @@ class Dell7609Client:
         needs_retry = self._is_login_page(text) or (
             path != "/" and self._is_frameset(text)
         )
+        # region agent log
+        _debug_log(
+            "C",
+            "api.py:_request_page",
+            "Page request evaluated",
+            {
+                "host": self._host,
+                "path": path,
+                "needsRetry": needs_retry,
+                "isLoginPage": self._is_login_page(text),
+                "isFrameset": self._is_frameset(text),
+                "hasCookie": self._cookie is not None,
+            },
+        )
+        # endregion
         if not needs_retry:
             return text
         # Session cookie expired or login required: rebuild and retry once.
@@ -425,6 +668,14 @@ class Dell7609Client:
                 f"Projector at {self._host} requires a valid admin password"
             )
         if path != "/" and self._is_frameset(text):
+            # region agent log
+            _debug_log(
+                "C",
+                "api.py:_request_page",
+                "Frameset retry failed",
+                {"host": self._host, "path": path, "hasCookie": self._cookie is not None},
+            )
+            # endregion
             raise Dell7609ConnectionError(
                 f"Projector at {self._host} keeps returning the frameset; "
                 "session could not be established"
@@ -433,36 +684,161 @@ class Dell7609Client:
 
     # ---- state ----------------------------------------------------------------
 
-    async def async_get_state(self) -> ProjectorState:
-        """Fetch and parse home.htm + status.htm into a ProjectorState."""
-        async with self._lock:
+    async def _try_status_page(self) -> str | None:
+        """Best-effort /status.htm for startup; never blocks for a full retry cycle."""
+        if self._cookie is None:
+            await self._bootstrap_session()
+        try:
+            text, _ = await self._raw_request(
+                "GET",
+                "/status.htm",
+                timeout=_OPTIONAL_STATUS_TIMEOUT,
+                max_attempts=1,
+            )
+        except Dell7609ConnectionError:
+            # region agent log
+            _debug_log(
+                "H",
+                "api.py:_try_status_page",
+                "Status page unavailable",
+                {"host": self._host},
+            )
+            # endregion
+            return None
+        if self._is_login_page(text) or self._is_frameset(text):
+            # region agent log
+            _debug_log(
+                "H",
+                "api.py:_try_status_page",
+                "Status page unusable",
+                {
+                    "host": self._host,
+                    "isLoginPage": self._is_login_page(text),
+                    "isFrameset": self._is_frameset(text),
+                },
+            )
+            # endregion
+            return None
+        return text
+
+    def _state_from_home(
+        self, home: str, status: str | None, *, preserve_form: bool
+    ) -> ProjectorState:
+        """Build state from /home.htm, optionally merging /status.htm."""
+        if status:
+            return self._parse_state(home, status)
+        state = self._parse_state(home, "")
+        if preserve_form and self.last_state:
+            raw = dict(self.last_state.raw_form)
+            # /home.htm status_text is authoritative when /status.htm is missing.
+            raw.pop("PJSTATE2", None)
+            raw.pop("PJSTATE", None)
+            return replace(state, raw_form=raw)
+        return state
+
+    async def _fetch_status_page(self, *, single_attempt: bool = False) -> str | None:
+        """Fetch /status.htm; return None instead of raising when the server is busy."""
+        if self._cookie is None:
+            await self._bootstrap_session()
+        timeout = _OPTIONAL_STATUS_TIMEOUT if single_attempt else _REQUEST_TIMEOUT
+        max_attempts = 1 if single_attempt else 2
+        try:
+            text, _ = await self._raw_request(
+                "GET",
+                "/status.htm",
+                timeout=timeout,
+                max_attempts=max_attempts,
+            )
+        except Dell7609ConnectionError:
+            return None
+        if self._is_login_page(text) or self._is_frameset(text):
+            await self._bootstrap_session()
+            try:
+                text, _ = await self._raw_request(
+                    "GET",
+                    "/status.htm",
+                    timeout=_OPTIONAL_STATUS_TIMEOUT,
+                    max_attempts=1,
+                )
+            except Dell7609ConnectionError:
+                return None
+            if self._is_login_page(text) or self._is_frameset(text):
+                return None
+        return text
+
+    async def async_get_state(self, *, refresh_home: bool = True) -> ProjectorState:
+        """Fetch projector state.
+
+        Routine polls should pass ``refresh_home=False`` to hit only /status.htm;
+        the firmware's single-threaded web server cannot sustain two page fetches
+        every 30 seconds without frequent 30-90s timeouts.
+        """
+        started = time.monotonic()
+        status_partial = False
+        stale_fallback = False
+        async with self._state_lock:
+            need_home = refresh_home or self.last_state is None
+            base = self.last_state
+
+        if need_home:
             home = await self._request_page("GET", "/home.htm")
-            status = await self._request_page("GET", "/status.htm")
-            state = self._parse_state(home, status)
-            self.last_state = state
-            return state
+            status = await self._try_status_page()
+            status_partial = status is None
+            async with self._state_lock:
+                state = self._state_from_home(
+                    home, status, preserve_form=status is None
+                )
+                if not status_partial:
+                    state = self.apply_power_hold_overlay(state)
+                self.last_state = state
+        else:
+            status = await self._fetch_status_page(single_attempt=True)
+            async with self._state_lock:
+                if status is None:
+                    if base is not None:
+                        stale_fallback = True
+                        status_partial = True
+                        state = self.apply_power_hold_overlay(base)
+                    else:
+                        raise Dell7609ConnectionError(
+                            f"Timeout talking to projector at {self._host}"
+                        )
+                else:
+                    state = self.apply_power_hold_overlay(
+                        self._apply_status(base, status)
+                    )
+                self.last_state = state
+        hold_active = (
+            self._power_hold_is_on is not None
+            and time.monotonic() < self._power_hold_until
+        )
+        # region agent log
+        _debug_log(
+            "F",
+            "api.py:async_get_state",
+            "State fetch complete",
+            {
+                "host": self._host,
+                "refreshHome": refresh_home,
+                "durationMs": int((time.monotonic() - started) * 1000),
+                "pjstate2": state.power_status,
+                "isOn": state.is_on,
+                "powerHold": self._power_hold_is_on if hold_active else None,
+                "statusPartial": status_partial,
+                "staleFallback": stale_fallback,
+            },
+        )
+        # endregion
+        return state
 
-    def _parse_state(self, home: str, status: str) -> ProjectorState:
-        state = ProjectorState()
+    @staticmethod
+    def _lamp_hours_from_text(text: str | None) -> int | None:
+        if not text:
+            return None
+        digits = re.search(r"\d+", text)
+        return int(digits.group(0)) if digits else None
 
-        # /home.htm
-        state.group_name = _home_value(home, "Group Name")
-        state.projector_name = _home_value(home, "Projector Name")
-        state.location = _home_value(home, "Location")
-        state.contact = _home_value(home, "Contact")
-        state.status_text = _home_value(home, "Status")
-        state.firmware_version = _home_value(home, "Firmware Version")
-        state.ip_address = _home_value(home, "IP Address")
-        state.mac_address = _home_value(home, "MAC Address")
-        lamp = _home_value(home, "Lamp Hours")
-        if lamp:
-            digits = re.search(r"\d+", lamp)
-            state.lamp_hours = int(digits.group(0)) if digits else None
-        admin = _home_value(home, "Admin Password")
-        if admin is not None:
-            state.password_enabled = not admin.lower().startswith("not")
-
-        # /status.htm form state
+    def _parse_status_form(self, status: str) -> dict[str, str]:
         raw: dict[str, str] = {}
         for name in (
             "PJSTATE",
@@ -488,10 +864,107 @@ class Dell7609Client:
             value = _selected_option_value(status, name)
             if value is not None:
                 raw[name] = value
-        state.raw_form = raw
+        return raw
+
+    def _apply_status(self, base: ProjectorState, status: str) -> ProjectorState:
+        raw = self._parse_status_form(status)
+        lamp_hours = self._lamp_hours_from_text(raw.get("LAMPHR")) or base.lamp_hours
+        return replace(base, raw_form=raw, lamp_hours=lamp_hours)
+
+    def _parse_state(self, home: str, status: str) -> ProjectorState:
+        state = ProjectorState()
+
+        # /home.htm
+        state.group_name = _home_value(home, "Group Name")
+        state.projector_name = _home_value(home, "Projector Name")
+        state.location = _home_value(home, "Location")
+        state.contact = _home_value(home, "Contact")
+        state.status_text = _home_value(home, "Status")
+        state.firmware_version = _home_value(home, "Firmware Version")
+        state.ip_address = _home_value(home, "IP Address")
+        state.mac_address = _home_value(home, "MAC Address")
+        state.lamp_hours = self._lamp_hours_from_text(_home_value(home, "Lamp Hours"))
+        admin = _home_value(home, "Admin Password")
+        if admin is not None:
+            state.password_enabled = not admin.lower().startswith("not")
+
+        state.raw_form = self._parse_status_form(status)
+        if state.lamp_hours is None:
+            state.lamp_hours = self._lamp_hours_from_text(state.raw_form.get("LAMPHR"))
         return state
 
     # ---- commands ---------------------------------------------------------------
+
+    @staticmethod
+    def _is_standby_state(state: ProjectorState | None) -> bool:
+        if state is None:
+            return True
+        pj = (state.power_status or state.status_text or "").strip().lower()
+        if pj.startswith("standby"):
+            return True
+        code = state._raw_int("PJSTATE")
+        return code == 0 if code is not None else not state.raw_form
+
+    def _standby_form_values(self) -> dict[str, str]:
+        """Merged standby defaults, cached session fields, and polled state."""
+        values = dict(_STANDBY_DEFAULTS)
+        if self.last_state:
+            lamphr = self.last_state.raw_form.get("LAMPHR")
+            if not lamphr and self.last_state.lamp_hours is not None:
+                lamphr = f"{self.last_state.lamp_hours} hr."
+            if lamphr:
+                values["LAMPHR"] = lamphr
+            for key in _STANDBY_ALWAYS | {"ecoMode", "hide", "Aspect"}:
+                if key in self.last_state.raw_form:
+                    values[key] = self.last_state.raw_form[key]
+        values.update(self._standby_form)
+        return values
+
+    def _persist_standby_fields(
+        self, overrides: dict[str, str] | None, parsed: dict[str, str]
+    ) -> None:
+        """Keep standby session fields aligned with the browser form."""
+        for key, value in (overrides or {}).items():
+            if key not in BUTTON_VALUES:
+                self._standby_form[key] = value
+        for key in (
+            "ecoMode",
+            "hide",
+            "Aspect",
+            "Bright",
+            "Contrast",
+            "Volume",
+            "PwSave",
+            "PrjMode",
+            "PrjSRC",
+            "VideoMode",
+        ):
+            if key in parsed:
+                self._standby_form[key] = parsed[key]
+
+    def _build_standby_payload(
+        self, button: str, overrides: dict[str, str] | None = None
+    ) -> dict[str, str]:
+        """Minimal standby POST matching browser field order and inclusion rules."""
+        if button not in BUTTON_VALUES:
+            raise ValueError(f"Unknown submit button: {button}")
+        values = self._standby_form_values()
+        if overrides:
+            values.update(overrides)
+        optional = set(self._standby_form) | set(overrides or {})
+        payload: dict[str, str] = {}
+        for name in _STANDBY_FORM_ORDER:
+            if name in ("PowerOn", "PowerOff"):
+                if name == button:
+                    payload[name] = BUTTON_VALUES[name]
+                continue
+            if name in BUTTON_VALUES:
+                if name == button:
+                    payload[name] = BUTTON_VALUES[name]
+                continue
+            if name in _STANDBY_ALWAYS or name in optional:
+                payload[name] = values.get(name, _STANDBY_DEFAULTS.get(name, ""))
+        return payload
 
     def _build_payload(
         self, button: str, overrides: dict[str, str] | None = None
@@ -510,24 +983,104 @@ class Dell7609Client:
                 payload[name] = base.get(name, "")
         return payload
 
-    async def _async_command(
-        self, button: str, overrides: dict[str, str] | None = None
+    def _apply_command_response(
+        self,
+        response: str,
+        *,
+        optimistic_pjstate2: str | None = None,
     ) -> None:
-        async with self._lock:
-            if self.last_state is None or not self.last_state.raw_form:
-                # Need current form state to rebuild the payload faithfully.
-                home = await self._request_page("GET", "/home.htm")
+        """Update cached state from a command POST body or transitional guess."""
+        if self.last_state is None:
+            return
+        parsed = self._parse_status_form(response)
+        if parsed.get("PJSTATE2"):
+            self.last_state = self._apply_status(self.last_state, response)
+            if not self._is_standby_state(self.last_state):
+                self._standby_form.clear()
+            else:
+                self._persist_standby_fields(None, parsed)
+        elif optimistic_pjstate2:
+            raw = dict(self.last_state.raw_form)
+            raw["PJSTATE2"] = optimistic_pjstate2
+            transitional = optimistic_pjstate2.strip().lower()
+            if transitional.startswith(("lamp", "warm")):
+                raw["PJSTATE"] = "1"
+                self._standby_form.clear()
+            elif transitional.startswith(("standby", "cooling")):
+                raw["PJSTATE"] = "0"
+            self.last_state = replace(self.last_state, raw_form=raw)
+
+    async def _async_command(
+        self,
+        button: str,
+        overrides: dict[str, str] | None = None,
+        *,
+        optimistic_pjstate2: str | None = None,
+    ) -> None:
+        payload_mode = "full"
+        use_standby = False
+        async with self._state_lock:
+            use_standby = self._is_standby_state(self.last_state)
+            needs_prefetch = (
+                not use_standby
+                and (self.last_state is None or not self.last_state.raw_form)
+            )
+            if use_standby:
+                payload = self._build_standby_payload(button, overrides)
+                payload_mode = "standby"
+            elif not needs_prefetch:
+                payload = self._build_payload(button, overrides)
+
+        if not use_standby and needs_prefetch:
+            status = await self._fetch_status_page(single_attempt=False)
+            if status is None:
                 status = await self._request_page("GET", "/status.htm")
-                self.last_state = self._parse_state(home, status)
-            payload = self._build_payload(button, overrides)
-            _LOGGER.debug("Sending %s to %s: %s", button, self._host, payload)
-            await self._request_page("POST", "/tgi/status.tgi", payload)
+            async with self._state_lock:
+                if self.last_state is None:
+                    home = await self._request_page("GET", "/home.htm")
+                    self.last_state = self._parse_state(home, status)
+                else:
+                    self.last_state = self._apply_status(self.last_state, status)
+                use_standby = self._is_standby_state(self.last_state)
+                if use_standby:
+                    payload = self._build_standby_payload(button, overrides)
+                    payload_mode = "standby"
+                else:
+                    payload = self._build_payload(button, overrides)
+
+        _LOGGER.debug("Sending %s to %s (%s): %s", button, self._host, payload_mode, payload)
+        response = await self._request_page("POST", "/tgi/status.tgi", payload)
+        async with self._state_lock:
+            if use_standby:
+                self._persist_standby_fields(overrides, self._parse_status_form(response))
+            self._apply_command_response(
+                response, optimistic_pjstate2=optimistic_pjstate2
+            )
+            # region agent log
+            _debug_log(
+                "G",
+                "api.py:_async_command",
+                "Command complete",
+                {
+                    "host": self._host,
+                    "button": button,
+                    "payloadMode": payload_mode,
+                    "payloadFields": len(payload),
+                    "responseLen": len(response),
+                    "pjstate2": self.last_state.power_status if self.last_state else None,
+                    "isOn": self.last_state.is_on if self.last_state else None,
+                    "optimistic": optimistic_pjstate2,
+                },
+            )
+            # endregion
 
     async def async_power_on(self) -> None:
-        await self._async_command("PowerOn")
+        await self._async_command("PowerOn", optimistic_pjstate2="Warm up ")
+        self.set_power_hold(True)
 
     async def async_power_off(self) -> None:
-        await self._async_command("PowerOff")
+        await self._async_command("PowerOff", optimistic_pjstate2="Cooling ")
+        self.set_power_hold(False)
 
     async def async_set_power_saving(self, minutes: int) -> None:
         await self._async_command("btnPwSave", {"PwSave": str(minutes)})
@@ -564,6 +1117,32 @@ class Dell7609Client:
     async def async_auto_adjust(self) -> None:
         await self._async_command("btnAutoAdj")
 
+    # ---- admin password (password.htm / password.tgi) -------------------------
+
+    async def async_set_admin_password(
+        self, password: str, *, snmp_write_community: str = "private"
+    ) -> None:
+        """Enable the web admin password and set SNMP write community.
+
+        Not exposed as a Home Assistant entity (security-sensitive). For tooling
+        and protocol reference see docs/PROTOCOL.md.
+        """
+        payload = {
+            "stateadm": "1",
+            "new_admin": password,
+            "verify_admin": password,
+            "Submit_admin": "Submit",
+            "snmp_pwdtable": snmp_write_community,
+        }
+        await self._request_page("POST", "/tgi/password.tgi", payload)
+        self._password = password or None
+
+    async def async_disable_admin_password(self) -> None:
+        """Turn off the web admin password requirement."""
+        payload = {"stateadm": "0", "btn_secuadm": "Submit"}
+        await self._request_page("POST", "/tgi/password.tgi", payload)
+        self._password = None
+
     # ---- validation -------------------------------------------------------------
 
     async def async_validate(self) -> ProjectorState:
@@ -572,10 +1151,49 @@ class Dell7609Client:
         Raises Dell7609UnsupportedError, Dell7609AuthError or
         Dell7609ConnectionError accordingly. Returns the current state.
         """
-        landing = await self._bootstrap_session()
-        if self._is_login_page(landing):
-            await self._async_login()
-        return await self.async_get_state()
+        # region agent log
+        _debug_log(
+            "E",
+            "api.py:async_validate",
+            "Validation started",
+            {"host": self._host, "hasPassword": self._password is not None},
+        )
+        # endregion
+        try:
+            landing = await self._bootstrap_session()
+            if self._is_login_page(landing):
+                await self._async_login()
+            home = await self._request_page("GET", "/home.htm")
+            status = await self._try_status_page()
+            async with self._state_lock:
+                state = self._state_from_home(
+                    home, status, preserve_form=status is None
+                )
+                self.last_state = state
+        except Dell7609Error as err:
+            # region agent log
+            _debug_log(
+                "E",
+                "api.py:async_validate",
+                "Validation failed",
+                {"host": self._host, "errorType": type(err).__name__, "error": str(err)},
+            )
+            # endregion
+            raise
+        # region agent log
+        _debug_log(
+            "E",
+            "api.py:async_validate",
+            "Validation succeeded",
+            {
+                "host": self._host,
+                "projectorName": state.projector_name,
+                "macAddress": state.mac_address,
+                "statusPartial": status is None,
+            },
+        )
+        # endregion
+        return state
 
 
 def state_as_dict(state: ProjectorState) -> dict[str, Any]:

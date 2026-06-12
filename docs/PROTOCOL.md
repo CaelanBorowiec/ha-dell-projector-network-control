@@ -173,6 +173,20 @@ curl -s -b jar.txt http://PROJECTOR/tgi/status.tgi \
 | `/tgi/network.tgi` | `network.htm` | network settings |
 | `/tgi/email.tgi` | `email.htm` | e-mail alert settings |
 
+Captured browser payloads for `/tgi/password.tgi`:
+
+```text
+# Enable admin password + set SNMP write community (one POST)
+stateadm=1&new_admin=SECRET&verify_admin=SECRET&Submit_admin=Submit&snmp_pwdtable=private
+
+# Disable admin password
+stateadm=0&btn_secuadm=Submit
+```
+
+Note: enable uses `Submit_admin`; disable uses `btn_secuadm` — different submit
+buttons. When enabling, the browser includes `snmp_pwdtable` in the same POST as
+`Submit_admin` (no separate `Submit_SNMP` in that capture).
+
 ## Value enums
 
 Source (`PrjSRC` write, `DSP_SOURCE` read):

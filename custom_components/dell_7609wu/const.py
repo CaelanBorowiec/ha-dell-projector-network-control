@@ -7,7 +7,12 @@ DOMAIN = "dell_7609wu"
 MANUFACTURER = "Dell"
 DEFAULT_MODEL = "Projector"
 
-DEFAULT_SCAN_INTERVAL_SECONDS = 30
+# The projector web server is single-threaded; polling too aggressively causes
+# multi-second (or minute-long) timeouts that make the UI feel laggy.
+DEFAULT_SCAN_INTERVAL_SECONDS = 60
+
+# Re-fetch /home.htm (static identity fields) every N coordinator polls.
+HOME_REFRESH_EVERY_N_POLLS = 15
 
 CONF_NOTE_USERNAME = "administrator"  # firmware-fixed, informational only
 

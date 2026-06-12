@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import (
     Dell7609AuthError,
@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Dell7609ConfigEntry) -> 
     """Set up Dell Projector from a config entry."""
     client = Dell7609Client(
         entry.data[CONF_HOST],
-        async_get_clientsession(hass),
+        async_create_clientsession(hass),
         password=entry.data.get(CONF_PASSWORD),
     )
     coordinator = Dell7609Coordinator(hass, entry, client)
