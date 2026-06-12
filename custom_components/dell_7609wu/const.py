@@ -1,4 +1,4 @@
-"""Constants for the Dell Projector integration."""
+"""Constants for the Dell Projector Network Interface integration."""
 
 from __future__ import annotations
 

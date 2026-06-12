@@ -3,7 +3,7 @@
     "flow_title": "{name}",
     "step": {
       "user": {
-        "title": "Dell Projector",
+        "title": "Dell Projector Network Interface",
         "description": "Set up a Dell projector by IP address. The username is fixed to 'administrator' by the projector firmware; only set a password if one is enabled in the projector's web management.",
         "data": {
           "host": "Host (IP address)",
@@ -11,7 +11,7 @@
         }
       },
       "discovery_confirm": {
-        "title": "Dell Projector found",
+        "title": "Dell Projector Network Interface found",
         "description": "Add the projector at {host}? If an admin password is enabled on the projector, enter it below (username is fixed to 'administrator').",
         "data": {
           "password": "Admin password (if enabled)"

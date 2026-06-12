@@ -31,7 +31,11 @@ class Dell7609Entity(CoordinatorEntity[Dell7609Coordinator]):
             manufacturer=MANUFACTURER,
             model=state.group_name or DEFAULT_MODEL,
             name=state.projector_name
-            or (f"Dell {state.group_name}" if state.group_name else "Dell Projector"),
+            or (
+                f"Dell {state.group_name}"
+                if state.group_name
+                else "Dell Projector Network Interface"
+            ),
             sw_version=state.firmware_version,
             configuration_url=f"http://{coordinator.client.host}/",
         )

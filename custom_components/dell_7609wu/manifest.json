@@ -1,6 +1,6 @@
 {
   "domain": "dell_7609wu",
-  "name": "Dell Projector",
+  "name": "Dell Projector Network Interface",
   "codeowners": ["@CaelanBorowiec"],
   "config_flow": true,
   "dhcp": [{ "macaddress": "001EC9*" }],
@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/CaelanBorowiec/ha-dell-projector-network-control/issues",
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.1.1"
 }

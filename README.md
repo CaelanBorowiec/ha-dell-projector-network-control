@@ -2,7 +2,7 @@
   <img src="images/logo.png" alt="DellHA Logo" width="300" />
 </p>
 
-# Dell Projector for Home Assistant
+# Dell Projector Network Interface for Home Assistant
 
 [![Validate](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/validate.yml)
 [![Lint](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml/badge.svg)](https://github.com/CaelanBorowiec/ha-dell-projector-network-control/actions/workflows/lint.yml)
@@ -84,7 +84,7 @@ actually a projector), but adding one manually by IP always works.
 1. In HACS, open the menu and pick "Custom repositories".
 2. Add `https://github.com/CaelanBorowiec/ha-dell-projector-network-control`
    with category "Integration".
-3. Install "Dell Projector" and restart Home Assistant.
+3. Install "Dell Projector Network Interface" and restart Home Assistant.
 
 ### Manual
 
@@ -94,7 +94,7 @@ Copy `custom_components/dell_7609wu/` into your Home Assistant
 ## Setup
 
 1. Go to Settings > Devices & Services > Add Integration and search for
-   "Dell Projector".
+   "Dell Projector Network Interface".
 2. Enter the projector's IP address.
 3. Enter the admin password if one is set on the projector, otherwise leave it
    blank.

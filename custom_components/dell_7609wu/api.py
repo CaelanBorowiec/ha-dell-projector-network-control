@@ -24,7 +24,8 @@ import hashlib
 import logging
 import re
 import time
-from dataclasses import dataclass, field as dc_field, replace
+from dataclasses import dataclass, replace
+from dataclasses import field as dc_field
 from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlencode
@@ -639,7 +640,6 @@ class Dell7609Client:
         every 30 seconds without frequent 30-90s timeouts.
         """
         status_partial = False
-        stale_fallback = False
         async with self._state_lock:
             need_home = refresh_home or self.last_state is None
             base = self.last_state
@@ -660,7 +660,6 @@ class Dell7609Client:
             async with self._state_lock:
                 if status is None:
                     if base is not None:
-                        stale_fallback = True
                         status_partial = True
                         state = self.apply_power_hold_overlay(base)
                     else:
@@ -988,7 +987,7 @@ class Dell7609Client:
                     home, status, preserve_form=status is None
                 )
                 self.last_state = state
-        except Dell7609Error as err:
+        except Dell7609Error:
             raise
         return state
 

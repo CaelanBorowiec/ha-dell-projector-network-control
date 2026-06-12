@@ -1,4 +1,4 @@
-"""Config flow for the Dell Projector integration."""
+"""Config flow for the Dell Projector Network Interface integration."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ PASSWORD_SCHEMA = vol.Schema({vol.Optional(CONF_PASSWORD): str})
 
 
 class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Dell Projector."""
+    """Handle a config flow for Dell Projector Network Interface."""
 
     VERSION = 1
 
@@ -52,7 +52,7 @@ class Dell7609ConfigFlow(ConfigFlow, domain=DOMAIN):
             return state.projector_name
         if state.group_name:
             return f"Dell {state.group_name}"
-        return "Dell Projector"
+        return "Dell Projector Network Interface"
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
