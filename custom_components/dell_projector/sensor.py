@@ -1,4 +1,4 @@
-"""Sensor entities for the Dell 7609WU integration."""
+"""Sensor entities for the Dell projector integration."""
 
 from __future__ import annotations
 
@@ -16,37 +16,37 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .api import ProjectorState
-from .coordinator import Dell7609ConfigEntry, Dell7609Coordinator
-from .entity import Dell7609Entity
+from .coordinator import DellProjectorConfigEntry, DellProjectorCoordinator
+from .entity import DellProjectorEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class Dell7609SensorDescription(SensorEntityDescription):
-    """Describes a Dell 7609WU sensor."""
+class DellProjectorSensorDescription(SensorEntityDescription):
+    """Describes a Dell projector sensor."""
 
     value_fn: Callable[[ProjectorState], StateType]
 
 
-SENSORS: tuple[Dell7609SensorDescription, ...] = (
-    Dell7609SensorDescription(
+SENSORS: tuple[DellProjectorSensorDescription, ...] = (
+    DellProjectorSensorDescription(
         key="status",
         translation_key="status",
         value_fn=lambda state: state.power_status,
     ),
-    Dell7609SensorDescription(
+    DellProjectorSensorDescription(
         key="lamp_hours",
         translation_key="lamp_hours",
         native_unit_of_measurement=UnitOfTime.HOURS,
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=lambda state: state.lamp_hours,
     ),
-    Dell7609SensorDescription(
+    DellProjectorSensorDescription(
         key="error_status",
         translation_key="error_status",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda state: state.error_status or "OK",
     ),
-    Dell7609SensorDescription(
+    DellProjectorSensorDescription(
         key="firmware_version",
         translation_key="firmware_version",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -58,25 +58,25 @@ SENSORS: tuple[Dell7609SensorDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: Dell7609ConfigEntry,
+    entry: DellProjectorConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors."""
     coordinator = entry.runtime_data
     async_add_entities(
-        Dell7609Sensor(coordinator, description) for description in SENSORS
+        DellProjectorSensor(coordinator, description) for description in SENSORS
     )
 
 
-class Dell7609Sensor(Dell7609Entity, SensorEntity):
+class DellProjectorSensor(DellProjectorEntity, SensorEntity):
     """A projector sensor."""
 
-    entity_description: Dell7609SensorDescription
+    entity_description: DellProjectorSensorDescription
 
     def __init__(
         self,
-        coordinator: Dell7609Coordinator,
-        description: Dell7609SensorDescription,
+        coordinator: DellProjectorCoordinator,
+        description: DellProjectorSensorDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

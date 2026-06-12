@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-DOMAIN = "dell_7609wu"
+DOMAIN = "dell_projector"
 
 MANUFACTURER = "Dell"
 DEFAULT_MODEL = "Projector"
