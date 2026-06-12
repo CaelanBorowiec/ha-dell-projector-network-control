@@ -21,12 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import re
 import time
 from dataclasses import dataclass, field as dc_field, replace
-from pathlib import Path
 from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlencode
@@ -35,32 +33,6 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
-# region agent log
-def _debug_log(
-    hypothesis_id: str, location: str, message: str, data: dict[str, Any]
-) -> None:
-    payload = {
-        "sessionId": "af4035",
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    line = json.dumps(payload) + "\n"
-    for log_path in (
-        Path(__file__).resolve().parents[2] / "debug-af4035.log",
-        Path(__file__).resolve().parent / "debug-af4035.log",
-    ):
-        try:
-            with log_path.open("a", encoding="utf-8") as log_file:
-                log_file.write(line)
-            break
-        except OSError:
-            continue
-
-
-# endregion
 
 _LOGIN_FORM_MARKER = "/tgi/login.tgi"
 _FRAMESET_MARKER = "<frameset"
@@ -490,64 +462,13 @@ class Dell7609Client:
                         timeout=effective_timeout,
                     ) as resp:
                         text = await resp.text(errors="replace")
-                        set_cookie = resp.headers.getall("Set-Cookie", [])
-                        cookie_before = self._cookie
                         self._store_cookie(resp)
-                        # region agent log
-                        _debug_log(
-                            "B",
-                            "api.py:_raw_request",
-                            "HTTP response",
-                            {
-                                "host": self._host,
-                                "method": method,
-                                "path": path,
-                                "attempt": attempt + 1,
-                                "status": resp.status,
-                                "setCookieCount": len(set_cookie),
-                                "cookieBefore": cookie_before is not None,
-                                "cookieAfter": self._cookie is not None,
-                                "textLen": len(text),
-                                "isFrameset": _FRAMESET_MARKER in text.lower(),
-                                "isLoginPage": _LOGIN_FORM_MARKER in text,
-                            },
-                        )
-                        # endregion
                         return text, resp
             except TimeoutError as err:
                 last_timeout = err
-                # region agent log
-                _debug_log(
-                    "A",
-                    "api.py:_raw_request",
-                    "Request timeout",
-                    {
-                        "host": self._host,
-                        "method": method,
-                        "path": path,
-                        "attempt": attempt + 1,
-                        "willRetry": attempt + 1 < max_attempts,
-                        "error": str(err),
-                    },
-                )
-                # endregion
                 if attempt + 1 < max_attempts:
                     continue
             except aiohttp.ClientError as err:
-                # region agent log
-                _debug_log(
-                    "A",
-                    "api.py:_raw_request",
-                    "Client error",
-                    {
-                        "host": self._host,
-                        "method": method,
-                        "path": path,
-                        "errorType": type(err).__name__,
-                        "error": str(err),
-                    },
-                )
-                # endregion
                 raise Dell7609ConnectionError(
                     f"Error talking to projector at {self._host}: {err}"
                 ) from err
@@ -568,19 +489,6 @@ class Dell7609Client:
         """Fetch / to obtain the ATOP session cookie; returns the page."""
         self._cookie = None
         text, _ = await self._raw_request("GET", "/")
-        # region agent log
-        _debug_log(
-            "C",
-            "api.py:_bootstrap_session",
-            "Bootstrap landing page",
-            {
-                "host": self._host,
-                "hasWebManagement": "Web Management" in text,
-                "hasCookie": self._cookie is not None,
-                "isLoginPage": self._is_login_page(text),
-            },
-        )
-        # endregion
         if "Web Management" not in text:
             raise Dell7609UnsupportedError(
                 f"Host {self._host} does not look like a supported Dell "
@@ -641,21 +549,6 @@ class Dell7609Client:
         needs_retry = self._is_login_page(text) or (
             path != "/" and self._is_frameset(text)
         )
-        # region agent log
-        _debug_log(
-            "C",
-            "api.py:_request_page",
-            "Page request evaluated",
-            {
-                "host": self._host,
-                "path": path,
-                "needsRetry": needs_retry,
-                "isLoginPage": self._is_login_page(text),
-                "isFrameset": self._is_frameset(text),
-                "hasCookie": self._cookie is not None,
-            },
-        )
-        # endregion
         if not needs_retry:
             return text
         # Session cookie expired or login required: rebuild and retry once.
@@ -668,14 +561,6 @@ class Dell7609Client:
                 f"Projector at {self._host} requires a valid admin password"
             )
         if path != "/" and self._is_frameset(text):
-            # region agent log
-            _debug_log(
-                "C",
-                "api.py:_request_page",
-                "Frameset retry failed",
-                {"host": self._host, "path": path, "hasCookie": self._cookie is not None},
-            )
-            # endregion
             raise Dell7609ConnectionError(
                 f"Projector at {self._host} keeps returning the frameset; "
                 "session could not be established"
@@ -696,28 +581,8 @@ class Dell7609Client:
                 max_attempts=1,
             )
         except Dell7609ConnectionError:
-            # region agent log
-            _debug_log(
-                "H",
-                "api.py:_try_status_page",
-                "Status page unavailable",
-                {"host": self._host},
-            )
-            # endregion
             return None
         if self._is_login_page(text) or self._is_frameset(text):
-            # region agent log
-            _debug_log(
-                "H",
-                "api.py:_try_status_page",
-                "Status page unusable",
-                {
-                    "host": self._host,
-                    "isLoginPage": self._is_login_page(text),
-                    "isFrameset": self._is_frameset(text),
-                },
-            )
-            # endregion
             return None
         return text
 
@@ -773,7 +638,6 @@ class Dell7609Client:
         the firmware's single-threaded web server cannot sustain two page fetches
         every 30 seconds without frequent 30-90s timeouts.
         """
-        started = time.monotonic()
         status_partial = False
         stale_fallback = False
         async with self._state_lock:
@@ -808,27 +672,6 @@ class Dell7609Client:
                         self._apply_status(base, status)
                     )
                 self.last_state = state
-        hold_active = (
-            self._power_hold_is_on is not None
-            and time.monotonic() < self._power_hold_until
-        )
-        # region agent log
-        _debug_log(
-            "F",
-            "api.py:async_get_state",
-            "State fetch complete",
-            {
-                "host": self._host,
-                "refreshHome": refresh_home,
-                "durationMs": int((time.monotonic() - started) * 1000),
-                "pjstate2": state.power_status,
-                "isOn": state.is_on,
-                "powerHold": self._power_hold_is_on if hold_active else None,
-                "statusPartial": status_partial,
-                "staleFallback": stale_fallback,
-            },
-        )
-        # endregion
         return state
 
     @staticmethod
@@ -1056,23 +899,6 @@ class Dell7609Client:
             self._apply_command_response(
                 response, optimistic_pjstate2=optimistic_pjstate2
             )
-            # region agent log
-            _debug_log(
-                "G",
-                "api.py:_async_command",
-                "Command complete",
-                {
-                    "host": self._host,
-                    "button": button,
-                    "payloadMode": payload_mode,
-                    "payloadFields": len(payload),
-                    "responseLen": len(response),
-                    "pjstate2": self.last_state.power_status if self.last_state else None,
-                    "isOn": self.last_state.is_on if self.last_state else None,
-                    "optimistic": optimistic_pjstate2,
-                },
-            )
-            # endregion
 
     async def async_power_on(self) -> None:
         await self._async_command("PowerOn", optimistic_pjstate2="Warm up ")
@@ -1151,14 +977,6 @@ class Dell7609Client:
         Raises Dell7609UnsupportedError, Dell7609AuthError or
         Dell7609ConnectionError accordingly. Returns the current state.
         """
-        # region agent log
-        _debug_log(
-            "E",
-            "api.py:async_validate",
-            "Validation started",
-            {"host": self._host, "hasPassword": self._password is not None},
-        )
-        # endregion
         try:
             landing = await self._bootstrap_session()
             if self._is_login_page(landing):
@@ -1171,28 +989,7 @@ class Dell7609Client:
                 )
                 self.last_state = state
         except Dell7609Error as err:
-            # region agent log
-            _debug_log(
-                "E",
-                "api.py:async_validate",
-                "Validation failed",
-                {"host": self._host, "errorType": type(err).__name__, "error": str(err)},
-            )
-            # endregion
             raise
-        # region agent log
-        _debug_log(
-            "E",
-            "api.py:async_validate",
-            "Validation succeeded",
-            {
-                "host": self._host,
-                "projectorName": state.projector_name,
-                "macAddress": state.mac_address,
-                "statusPartial": status is None,
-            },
-        )
-        # endregion
         return state
 
 
