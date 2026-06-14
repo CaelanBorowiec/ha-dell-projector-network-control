@@ -568,6 +568,57 @@ class DellProjectorClient:
             )
         return text
 
+    async def _post_status_command(
+        self,
+        payload: dict[str, str],
+        *,
+        tolerate_unusable_response: bool = False,
+    ) -> str:
+        """POST a /status.htm form submission.
+
+        During power on/off the firmware often returns the root frameset or stops
+        responding while the lamp transitions, even though the command was accepted.
+        """
+        if self._cookie is None:
+            await self._bootstrap_session()
+
+        async def _submit() -> str:
+            try:
+                return (await self._raw_request("POST", "/tgi/status.tgi", payload))[0]
+            except DellProjectorConnectionError:
+                if tolerate_unusable_response:
+                    _LOGGER.debug(
+                        "Projector at %s did not respond to command POST; "
+                        "assuming it was accepted during a power transition",
+                        self._host,
+                    )
+                    return ""
+                raise
+
+        text = await _submit()
+        if self._is_login_page(text):
+            landing = await self._bootstrap_session()
+            if self._is_login_page(landing):
+                await self._async_login()
+            text = await _submit()
+            if self._is_login_page(text):
+                raise DellProjectorAuthError(
+                    f"Projector at {self._host} requires a valid admin password"
+                )
+        if self._is_frameset(text):
+            if tolerate_unusable_response:
+                _LOGGER.debug(
+                    "Projector at %s returned the frameset after command POST; "
+                    "assuming a power transition is in progress",
+                    self._host,
+                )
+                return ""
+            raise DellProjectorConnectionError(
+                f"Projector at {self._host} keeps returning the frameset; "
+                "session could not be established"
+            )
+        return text
+
     # ---- state ----------------------------------------------------------------
 
     async def _try_status_page(self) -> str | None:
@@ -892,7 +943,13 @@ class DellProjectorClient:
         _LOGGER.debug(
             "Sending %s to %s (%s): %s", button, self._host, payload_mode, payload
         )
-        response = await self._request_page("POST", "/tgi/status.tgi", payload)
+        tolerate_response = button in ("PowerOn", "PowerOff")
+        if tolerate_response:
+            response = await self._post_status_command(
+                payload, tolerate_unusable_response=True
+            )
+        else:
+            response = await self._request_page("POST", "/tgi/status.tgi", payload)
         async with self._state_lock:
             if use_standby:
                 self._persist_standby_fields(
@@ -903,12 +960,12 @@ class DellProjectorClient:
             )
 
     async def async_power_on(self) -> None:
-        await self._async_command("PowerOn", optimistic_pjstate2="Warm up ")
         self.set_power_hold(True)
+        await self._async_command("PowerOn", optimistic_pjstate2="Warm up ")
 
     async def async_power_off(self) -> None:
-        await self._async_command("PowerOff", optimistic_pjstate2="Cooling ")
         self.set_power_hold(False)
+        await self._async_command("PowerOff", optimistic_pjstate2="Cooling ")
 
     async def async_set_power_saving(self, minutes: int) -> None:
         await self._async_command("btnPwSave", {"PwSave": str(minutes)})
